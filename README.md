@@ -1,132 +1,138 @@
-# FastGit
+<div align="center">
 
-[![一键部署到 Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ZhangShengFan/FastGit)
-[![部署到阿里云 ESA Pages](https://img.shields.io/badge/部署到阿里云_ESA_Pages-FF6A00?style=for-the-badge)](https://esa.console.aliyun.com/edge/pages/list)
+# FastGit — GitHub 镜像加速
 
-一个部署在 Cloudflare Workers 或阿里云 ESA Pages 上的 GitHub 镜像 Worker。
+**部署一个边缘函数，把 `github.com` 换成你自己的域名即可访问。**  
+网页、静态资源、Raw 文件、Release 附件、仓库压缩包，以及 Git Smart HTTP 请求全部走镜像代理。
 
-部署后，访问自己的域名就是 GitHub 的镜像入口。网页、头像、静态资源、Raw 文件、Release 附件、仓库压缩包，以及 Git Smart HTTP 请求都会转发到 GitHub 相关上游。
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Cloudflare Workers](https://img.shields.io/badge/Runtime-Cloudflare_Workers-f6821f.svg?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![阿里云 ESA](https://img.shields.io/badge/Runtime-阿里云_ESA-FF6A00.svg?logo=alibabacloud&logoColor=white)](https://www.aliyun.com/product/esa)
+[![Linux Do](https://img.shields.io/badge/Linux%20Do-Community-ffb003?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNsaXBQYXRoIGlkPSJhIj48Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSI0NyIvPjwvY2xpcFBhdGg+PGNpcmNsZSBmaWxsPSIjZjBmMGYwIiBjeD0iNjAiIGN5PSI2MCIgcj0iNTAiLz48cmVjdCBmaWxsPSIjMWMxYzFlIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSIxMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIzMCIvPjxyZWN0IGZpbGw9IiNmMGYwZjAiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjQwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIi8+PHJlY3QgZmlsbD0iI2ZmYjAwMyIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iODAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48L3N2Zz4=)](https://linux.do)
 
-> FastGit 与 GitHub、Cloudflare、阿里云没有官方关系。请自行遵守所在地法律法规，以及 GitHub 和边缘服务商的服务条款。
+**[📖 Cloudflare 部署教程](DEPLOY.md)　·　[📖 阿里云 ESA 部署教程](ESA-DEPLOY.md)**
 
-## 有什么用
+</div>
 
-- 直接打开 GitHub 页面，不需要改前端地址
-- 静态资源、Raw 文件、Release 下载和源码压缩包会自动走镜像
-- 支持 `git clone`、`git fetch` 等 Smart HTTP 请求
-- 提供 `/healthy` 状态页
-- 默认不开放 GitHub 网页登录，也只缓存公开静态资源
+---
 
-仓库文件不多：
+## 功能特性
 
-| 文件 | 用途 |
-| --- | --- |
-| `worker-cloudflare.js` | Cloudflare Workers 入口 |
-| `wrangler.jsonc` | Cloudflare Workers 部署配置 |
-| `worker-esa.js` | 阿里云 ESA Pages 入口 |
-| `esa.jsonc` | 阿里云 ESA Pages 构建配置 |
-| `DEPLOY.md` | Cloudflare Workers 完整部署教程 |
-| `ESA-DEPLOY.md` | 阿里云 ESA Pages 完整部署教程 |
+| 功能 | 说明 |
+|------|------|
+| GitHub 网页镜像 | 打开镜像域名即可访问 GitHub 官方界面 |
+| 静态资源代理 | 头像、图片、CSS/JS 等静态资源自动改写到镜像 |
+| Raw 文件代理 | `raw.githubusercontent.com` 内容通过镜像访问 |
+| Release 代理 | 版本发布附件、源码压缩包可正常下载 |
+| Git Smart HTTP | 支持 `git clone`、`git fetch` 等命令 |
+| 双平台部署 | 同时支持 Cloudflare Workers 与阿里云 ESA Pages |
+| 可选网页登录 | 默认关闭，按需通过环境变量开启 |
+| 域名白名单 | 只允许访问 GitHub 相关上游域名 |
+| 健康检查页 | `/healthy` 显示上游状态、版本、耗时 |
 
-## 部署
+---
+
+## 架构说明
+
+```
+浏览器
+  │
+  ▼
+Cloudflare Workers / 阿里云 ESA
+  │  worker-cloudflare.js / worker-esa.js
+  │  代理网页、静态资源、Raw、Release、Git Smart HTTP
+  ▼
+GitHub 上游（github.com / raw.githubusercontent.com / codeload.github.com ...）
+```
+
+---
+
+## 项目结构
+
+```
+FastGit/
+├── worker-cloudflare.js     # Cloudflare Workers 入口
+├── wrangler.jsonc           # Cloudflare Workers 部署配置
+├── worker-esa.js            # 阿里云 ESA Pages 入口
+├── esa.jsonc                # 阿里云 ESA Pages 构建配置
+├── DEPLOY.md                # Cloudflare Workers 部署教程
+├── ESA-DEPLOY.md            # 阿里云 ESA Pages 部署教程
+└── LICENSE
+```
+
+---
+
+## 快速部署
+
+> 完整教程见 **[Cloudflare 部署教程](DEPLOY.md)** / **[阿里云 ESA 部署教程](ESA-DEPLOY.md)**
 
 ### Cloudflare Workers
 
-点上面的 **一键部署到 Cloudflare** 即可。部署配置会自动读取根目录中的 `wrangler.jsonc`。
-
-如果想直接在 Dashboard 里部署：
-
-1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com/)。
-2. 进入 **Workers & Pages**，点击 **Create application**。
-3. 选择 **Create Worker**，命名后部署。
-4. 在 Worker 的 **Overview** 页面点击 **Edit code**。
-5. 删除示例代码，复制 [worker-cloudflare.js](worker-cloudflare.js) 的全部内容。
-6. 点击 **Deploy**。
-
-详细的首次部署、环境变量和自定义域名配置见 [DEPLOY.md](DEPLOY.md)。
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)。
+2. **Workers & Pages** → **Create application** → **Create Worker**，命名后部署。
+3. Worker **Overview** → **Edit code**，删除示例代码，粘贴 [worker-cloudflare.js](worker-cloudflare.js) 全部内容。
+4. 点击 **Deploy**。
+5. 打开 `*.workers.dev` 地址验证是否可用，需要自定义域名参考 [DEPLOY.md](DEPLOY.md)。
 
 ### 阿里云 ESA Pages
 
-点上面的 ESA 按钮进入控制台，然后导入本仓库：
+1. 进入 ESA 控制台 **边缘计算和 AI** → **函数和 Pages**。
+2. **创建** → **导入 GitHub 仓库**，选择本仓库 `main` 分支。
+3. `esa.jsonc` 会自动指定 `worker-esa.js` 为入口，无需额外配置。
+4. **开始部署**，完成后绑定自定义域名。
 
-1. 进入 **边缘计算和 AI** > **函数和 Pages**。
-2. 点击 **创建**，选择 **导入 GitHub 仓库**。
-3. 选择本仓库和 `main` 分支。
-4. `esa.jsonc` 会自动使用 `worker-esa.js` 作为入口。
-5. 点击 **开始部署**，部署完成后绑定域名。
+---
 
-完整操作过程见 [ESA-DEPLOY.md](ESA-DEPLOY.md)。
+## 使用方式
 
-## 使用
-
-假设部署后的域名是：
-
-```text
-https://git.example.com
-```
-
-将 GitHub 链接里的 `github.com` 换成自己的域名：
+假设部署后的域名是 `git.example.com`，把链接里的 `github.com` 换成它即可：
 
 ```text
 GitHub：https://github.com/cloudflare/workers-sdk
 镜像：https://git.example.com/cloudflare/workers-sdk
 ```
 
-克隆公开仓库：
+克隆仓库：
 
 ```powershell
 git clone https://git.example.com/owner/repository.git
 ```
 
-将已有仓库的远程地址改为镜像：
+替换已有仓库的远程地址：
 
 ```powershell
 git remote set-url origin https://git.example.com/owner/repository.git
 git fetch origin
 ```
 
-如果网页能打开，但 Git 报 TLS 或 SSL 错误，优先检查域名是否通过 Worker 的 **Custom Domain** 直接绑定。不要在前面再套多层 CNAME 或第三方中转。
+---
 
-### 健康检查
+## 配置项
 
-访问：
-
-```text
-https://你的域名/healthy
-```
-
-正常时返回 `200` 和 `OK`；GitHub 上游不可用时返回 `503`。页面也会显示上游状态、当前版本、登录状态、检查耗时和检查时间。
-
-版本信息默认读取 `SOURCE_REPOSITORY` 中仓库的 `main` 分支最新提交。
-
-## 配置与注意事项
-
-所有配置都在平台仪表盘通过环境变量修改，不需要改代码。
-
-| 变量 | 默认值 | 作用 |
-| --- | --- | --- |
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
 | `ALLOW_LOGIN` | `false` | 设为 `true` 才允许通过镜像打开 GitHub 登录页 |
 | `SOURCE_REPOSITORY` | `ZhangShengFan/FastGit` | `/healthy` 显示版本信息时读取的仓库 |
-| `CACHE_TTL` | `3600` | 静态资源缓存时间，单位为秒；设为 `0` 关闭缓存，最大为 `86400` |
+| `CACHE_TTL` | `3600` | 静态资源缓存秒数，`0` 关闭缓存，最大 `86400` |
 
-Cloudflare Workers 在 **Settings** > **Variables and Secrets** 中修改。
+Cloudflare Workers：**Settings** → **Variables and Secrets**  
+阿里云 ESA：项目 **基本信息** → **构建信息** → **修改**
 
-阿里云 ESA Pages 在项目 **基本信息** > **构建信息** > **修改** 中调整环境变量。保存后重新部署才会生效。
+---
 
-### 关于网页登录
+## 注意事项
 
-默认不要开启 `ALLOW_LOGIN`。
+- 默认不要开启 `ALLOW_LOGIN`；开启后 GitHub 登录表单、验证码、浏览器会话都会经过你的边缘函数，只适合自用实例
+- 通行密钥、部分风控流程仍可能要求原始 `github.com` 域名，镜像下不保证生效
+- 自定义域名建议直接用平台的 Custom Domain，不要叠加多层 CNAME，否则 Git 客户端可能 TLS 握手失败
+- 不记录 Cookie、Authorization、令牌、表单内容或请求正文；不缓存私有内容和下载文件
 
-开启后，GitHub 的登录表单、验证码和浏览器会话会经过你部署的边缘函数。这个功能只适合你自己控制、自己使用的实例，不适合公开提供给其他人。
-
-即使开启登录，通行密钥、网页身份验证以及 GitHub 的部分风控流程仍可能要求使用原始 `github.com` 域名，不能保证都能在镜像域名下正常工作。
-
-另外，不要记录 Cookie、Authorization、令牌、表单内容或请求正文；也不要缓存 API 响应、私有内容和下载文件。
-
-## 友链
-
-- [LINUX DO](https://linux.do/)：新的理想型社区
+---
 
 ## License
 
 [MIT License](LICENSE)
+
+## 友链
+
+[![Linux Do](https://img.shields.io/badge/Linux%20Do-Community-ffb003?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNsaXBQYXRoIGlkPSJhIj48Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSI0NyIvPjwvY2xpcFBhdGg+PGNpcmNsZSBmaWxsPSIjZjBmMGYwIiBjeD0iNjAiIGN5PSI2MCIgcj0iNTAiLz48cmVjdCBmaWxsPSIjMWMxYzFlIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSIxMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIzMCIvPjxyZWN0IGZpbGw9IiNmMGYwZjAiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjQwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIi8+PHJlY3QgZmlsbD0iI2ZmYjAwMyIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iODAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48L3N2Zz4=)](https://linux.do)
