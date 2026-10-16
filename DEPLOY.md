@@ -100,9 +100,10 @@ https://git.example.com
 ```text
 https://git.example.com
 https://git.example.com/cloudflare/workers-sdk
+https://git.example.com/https://github.com/cloudflare/workers-sdk
 ```
 
-页面应正常显示，链接应继续使用镜像域名。
+页面应正常显示，链接应继续使用镜像域名。最后一种是把完整 GitHub 链接拼在镜像域名后的透传写法，效果与第二种相同。
 
 ### 静态资源
 

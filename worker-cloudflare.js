@@ -395,6 +395,9 @@ function renderHealthPage({ healthy, upstreamStatus, duration, checkedAt, loginE
 }
 
 function getUpstreamUrl(publicUrl) {
+  const embedded = getEmbeddedUpstreamUrl(publicUrl);
+  if (embedded) return embedded;
+
   if (!publicUrl.pathname.startsWith(PROXY_PREFIX)) {
     return new URL(`https://${PRIMARY_HOST}${publicUrl.pathname}${publicUrl.search}`);
   }
@@ -409,6 +412,37 @@ function getUpstreamUrl(publicUrl) {
   }
 
   return new URL(`https://${hostname}${pathname}${publicUrl.search}`);
+}
+
+// Supports the gh-proxy style "https://<mirror>/https://github.com/owner/repo".
+function getEmbeddedUpstreamUrl(publicUrl) {
+  const candidate = publicUrl.pathname.replace(/^\/+/, "");
+  const decoded = candidate.includes("%") ? safeDecode(candidate) : candidate;
+  if (!/^https?:\/\//i.test(decoded)) return null;
+
+  let target;
+  try {
+    target = new URL(decoded);
+  } catch {
+    return null;
+  }
+
+  if (!isGithubHost(target.hostname)) {
+    throw new Error("Upstream host is not allowed");
+  }
+
+  target.protocol = "https:";
+  if (publicUrl.search) target.search = publicUrl.search;
+  target.hash = "";
+  return target;
+}
+
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function isGithubHost(hostname) {

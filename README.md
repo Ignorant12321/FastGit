@@ -25,6 +25,7 @@
 | Raw 文件代理 | `raw.githubusercontent.com` 内容通过镜像访问 |
 | Release 代理 | 版本发布附件、源码压缩包可正常下载 |
 | Git Smart HTTP | 支持 `git clone`、`git fetch` 等命令 |
+| 完整链接透传 | 支持 `<镜像域名>/https://github.com/owner/repo` 写法 |
 | 双平台部署 | 同时支持 Cloudflare Workers 与阿里云 ESA Pages |
 | 可选网页登录 | 默认关闭，按需通过环境变量开启 |
 | 域名白名单 | 只允许访问 GitHub 相关上游域名 |
@@ -136,3 +137,23 @@ Cloudflare Workers：**Settings** → **Variables and Secrets**
 ## 友链
 
 [![Linux Do](https://img.shields.io/badge/Linux%20Do-Community-ffb003?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNsaXBQYXRoIGlkPSJhIj48Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSI0NyIvPjwvY2xpcFBhdGg+PGNpcmNsZSBmaWxsPSIjZjBmMGYwIiBjeD0iNjAiIGN5PSI2MCIgcj0iNTAiLz48cmVjdCBmaWxsPSIjMWMxYzFlIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSIxMCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIzMCIvPjxyZWN0IGZpbGw9IiNmMGYwZjAiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjQwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjQwIi8+PHJlY3QgZmlsbD0iI2ZmYjAwMyIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iODAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48L3N2Zz4=)](https://linux.do)
+
+## 改进
+
+### 网址拼接
+
+也支持把完整的 GitHub 链接直接拼在镜像域名后面（gh-proxy 风格的链接透传）：
+
+```text
+镜像：https://git.example.com/https://github.com/cloudflare/workers-sdk
+```
+
+| 请求                                                     | 转发到                           |
+| -------------------------------------------------------- | -------------------------------- |
+| xxx.com/A/B                                              | github.com/A/B                   |
+| xxx.com/https://github.com/A/B                           | github.com/A/B                   |
+| xxx.com/http://github.com/A/B                            | github.com/A/B（自动升级 https） |
+| xxx.com/https://github.com/A/B?tab=readme                | github.com/A/B?tab=readme        |
+| xxx.com/https%3A%2F%2Fgithub.com%2FA%2FB                 | github.com/A/B                   |
+| xxx.com/https://raw.githubusercontent.com/A/B/main/x.txt | raw.githubusercontent.com/...    |
+| xxx.com/https://evil.com/A/B 等 4 个恶意样例             | 全部被拦截 ✅                     |
