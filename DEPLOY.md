@@ -76,6 +76,27 @@ https://你的-Worker.你的子域.workers.dev/healthy
 
 `PROXY_COUNTRIES` 默认 `CN`：国内访客走镜像代理，海外访客直接跳转真实 GitHub。设为 `*` 可关闭分流，让所有访客都走代理。
 
+## 分流诊断
+
+在实际访问镜像的浏览器中打开 `/__fastgit/diagnostics`，检查 Worker 接收到的地区及生效规则：
+
+```json
+{
+  "country": "US",
+  "countrySource": "request.cf.country",
+  "proxyCountries": ["CN"],
+  "route": "direct",
+  "reason": "country-not-proxied"
+}
+```
+
+- `route=direct`：普通仓库请求将跳转 GitHub；`route=proxy`：继续走镜像。
+- `reason=split-disabled`：生效的 `PROXY_COUNTRIES` 是 `*`。`keep_vars` 会保留 Dashboard 的旧变量，更新代码不会覆盖它，需在 Dashboard 修改。
+- `reason=country-unknown`：当前请求没有有效地区信息，保留代理；应在实际部署的域名上检查。
+- `country=CN`：当前访问镜像的连接被识别为中国大陆；浏览器的代理分流规则可能让镜像域名走直连。
+
+普通响应还包含 `X-FastGit-Country`、`X-FastGit-Proxy-Countries`、`X-FastGit-Route` 标头。诊断端点、健康页在本地返回，不随海外分流跳转。
+
 ## 绑定自定义域名
 
 1. 进入 **Workers & Pages**。
@@ -106,7 +127,7 @@ https://git.example.com/cloudflare/workers-sdk
 https://git.example.com/https://github.com/cloudflare/workers-sdk
 ```
 
-页面应正常显示，链接应继续使用镜像域名。最后一种是把完整 GitHub 链接拼在镜像域名后的透传写法，效果与第二种相同。
+对于走代理的访客，页面应正常显示，链接应继续使用镜像域名。最后一种完整链接写法会先返回 `302`，跳转到镜像内的标准仓库路径，确保 GitHub 前端路由和提交信息加载正常。海外访客按分流规则直接跳转 GitHub。
 
 ### 静态资源
 

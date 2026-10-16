@@ -41,7 +41,9 @@ export default {
       const sourceRepository = readRepository(env?.SOURCE_REPOSITORY, DEFAULT_SOURCE_REPOSITORY);
       const cacheTtl = readInteger(env?.CACHE_TTL, DEFAULT_CACHE_TTL, 0, 86400);
       const proxyCountries = readCountries(env?.PROXY_COUNTRIES, DEFAULT_PROXY_COUNTRIES);
-      return await proxyRequest(request, ctx, { loginEnabled, sourceRepository, cacheTtl, proxyCountries });
+      const routing = getRoutingInfo(request, proxyCountries);
+      const response = await proxyRequest(request, ctx, { loginEnabled, sourceRepository, cacheTtl, routing });
+      return withRoutingHeaders(response, routing);
     } catch (error) {
       const errorId = createErrorId();
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -90,31 +92,42 @@ function readInteger(value, fallback, min, max) {
 // Parses a comma separated list of ISO 3166-1 alpha-2 codes.
 // Returns null to mean "proxy every visitor" (feature disabled).
 function readCountries(value, fallback) {
-  const raw = String(value ?? fallback).trim();
+  const raw = String(value ?? fallback).trim() || String(fallback).trim();
   if (raw === "*") return null;
   const countries = raw
     .split(",")
     .map((item) => item.trim().toUpperCase())
-    .filter(Boolean);
-  return countries.length > 0 ? new Set(countries) : null;
+    .filter((item) => /^[A-Z]{2}$/.test(item));
+  return new Set(countries.length > 0 ? countries : String(fallback).split(",").map((item) => item.trim().toUpperCase()));
 }
 
 async function proxyRequest(request, ctx, settings) {
-  const { loginEnabled, sourceRepository, cacheTtl, proxyCountries } = settings;
+  const { loginEnabled, sourceRepository, cacheTtl, routing } = settings;
   const publicUrl = new URL(request.url);
+
+  if (publicUrl.pathname === "/__fastgit/diagnostics") {
+    return createRoutingDiagnostics(routing, request.method);
+  }
 
   if (publicUrl.pathname === "/healthy") {
     return createHealthResponse(loginEnabled, sourceRepository);
   }
 
-  const upstreamUrl = getUpstreamUrl(publicUrl);
+  const embeddedUpstreamUrl = getEmbeddedUpstreamUrl(publicUrl);
+  const upstreamUrl = embeddedUpstreamUrl || getUpstreamUrl(publicUrl);
 
   if (!loginEnabled && isLoginPath(upstreamUrl.pathname)) {
     return createLoginDisabledResponse();
   }
 
-  if (shouldRedirectUpstream(request, proxyCountries)) {
+  if (routing.route === "direct") {
     return createDirectRedirect(upstreamUrl, request.method);
+  }
+
+  // GitHub's client router expects /owner/repo to match the browser pathname.
+  // A wrapped /https://github.com/... URL leaves deferred queries uninitialized.
+  if (embeddedUpstreamUrl && (request.method === "GET" || request.method === "HEAD")) {
+    return createCanonicalRedirect(publicUrl, upstreamUrl);
   }
 
   const requestHeaders = new Headers(request.headers);
@@ -223,6 +236,7 @@ function createLoginDisabledResponse() {
       "Cache-Control": "no-store",
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "X-FastGit-Login": "disabled",
+      "X-FastGit-Route": "blocked",
     },
   });
 }
@@ -320,6 +334,7 @@ async function createHealthResponse(loginEnabled, sourceRepository) {
       "Cache-Control": "no-store",
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "X-FastGit-Commit": commitVersion,
+      "X-FastGit-Route": "local",
     },
   });
 }
@@ -482,28 +497,68 @@ function isLoginPath(pathname) {
   return /^\/(?:login|session|sessions|signup|password_reset)(?:\/|$)/.test(pathname);
 }
 
-// Whether the visitor should skip the mirror and be sent to the real upstream.
-// proxyCountries === null disables the split; unknown countries stay proxied.
-function shouldRedirectUpstream(request, proxyCountries) {
-  if (!proxyCountries) return false;
-  const upgrade = request.headers.get("Upgrade");
-  if (upgrade && upgrade.toLowerCase() === "websocket") return false;
-  const country = getClientCountry(request);
-  if (!country || country === "XX") return false;
-  return !proxyCountries.has(country);
+// Country metadata can be absent in previews or behind another proxy.
+// Keep unknown visitors on the mirror and expose the decision for diagnosis.
+function getRoutingInfo(request, proxyCountries) {
+  const candidates = [
+    ["request.cf.country", request.cf?.country],
+    ["cf-ipcountry", request.headers.get("cf-ipcountry")],
+    ["ali-ip-country", request.headers.get("ali-ip-country")],
+    ["x-client-country", request.headers.get("x-client-country")],
+  ];
+  let country = "UNKNOWN";
+  let countrySource = "none";
+  for (const [source, value] of candidates) {
+    const candidate = String(value ?? "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(candidate) || candidate === "XX") continue;
+    country = candidate;
+    countrySource = source;
+    break;
+  }
+
+  let route = "proxy";
+  let reason = "country-proxied";
+  if (!proxyCountries) reason = "split-disabled";
+  else if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") reason = "websocket";
+  else if (country === "UNKNOWN") reason = "country-unknown";
+  else if (!proxyCountries.has(country)) {
+    route = "direct";
+    reason = "country-not-proxied";
+  }
+  return { country, countrySource, proxyCountries: proxyCountries ? [...proxyCountries] : ["*"], route, reason };
 }
 
-function getClientCountry(request) {
-  let country = "";
-  if (request.cf && typeof request.cf.country === "string") country = request.cf.country;
-  if (!country) {
-    country =
-      request.headers.get("cf-ipcountry") ||
-      request.headers.get("ali-ip-country") ||
-      request.headers.get("x-client-country") ||
-      "";
-  }
-  return String(country).trim().toUpperCase();
+function withRoutingHeaders(response, routing) {
+  if (response.status === 101) return response;
+  response.headers.set("X-FastGit-Country", routing.country);
+  response.headers.set("X-FastGit-Proxy-Countries", routing.proxyCountries.join(","));
+  if (!response.headers.has("X-FastGit-Route")) response.headers.set("X-FastGit-Route", routing.route);
+  return response;
+}
+
+function createRoutingDiagnostics(routing, method) {
+  return new Response(method === "HEAD" ? null : JSON.stringify(routing, null, 2), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-FastGit-Route": "local",
+    },
+  });
+}
+
+function createCanonicalRedirect(publicUrl, upstreamUrl) {
+  const canonicalUrl = new URL(publicUrl.origin);
+  canonicalUrl.pathname = upstreamUrl.hostname === PRIMARY_HOST
+    ? upstreamUrl.pathname
+    : `${PROXY_PREFIX}${upstreamUrl.hostname}${upstreamUrl.pathname}`;
+  canonicalUrl.search = upstreamUrl.search;
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: canonicalUrl.toString(),
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 function createDirectRedirect(upstreamUrl, method) {
@@ -562,7 +617,11 @@ async function buildResponse(upstreamResponse, publicUrl, upstreamUrl, method) {
     });
   }
 
-  const body = rewriteText(await upstreamResponse.text(), publicUrl);
+  const originalBody = await upstreamResponse.text();
+  const body = rewriteText(originalBody, publicUrl);
+  if (contentType.includes("text/html")) {
+    await rewriteInlineScriptHashes(originalBody, headers, publicUrl);
+  }
   headers.delete("Content-Length");
   headers.delete("Content-Encoding");
   headers.delete("ETag");
@@ -591,6 +650,62 @@ function rewriteText(input, publicUrl) {
   output = output.replaceAll("http://github.com", origin);
   output = output.replaceAll("https:\\/\\/github.com", origin.replaceAll("/", "\\/"));
   return output;
+}
+
+// URL rewriting changes inline import maps and scripts. Keep their existing CSP
+// authorizations valid without allowing any additional inline script content.
+async function rewriteInlineScriptHashes(html, headers, publicUrl) {
+  const headerNames = ["Content-Security-Policy", "Content-Security-Policy-Report-Only"];
+  const scriptDirectives = new Set(["default-src", "script-src", "script-src-elem"]);
+  const authorizedHashes = new Set();
+  const algorithms = new Set();
+
+  for (const headerName of headerNames) {
+    for (const directive of (headers.get(headerName) || "").split(";")) {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      if (!scriptDirectives.has(name.toLowerCase())) continue;
+      for (const source of sources) {
+        const match = /^'sha(256|384|512)-[A-Za-z0-9+/]+={0,2}'$/.exec(source);
+        if (!match) continue;
+        authorizedHashes.add(source);
+        algorithms.add(match[1]);
+      }
+    }
+  }
+  if (authorizedHashes.size === 0) return;
+
+  const replacements = new Map();
+  const scripts = /<script\b(?:[^"'<>]|"[^"]*"|'[^']*')*>([\s\S]*?)<\/script\s*>/gi;
+  for (const match of html.matchAll(scripts)) {
+    // HTML parsing normalizes line endings before the browser checks CSP hashes.
+    const original = match[1].replace(/\r\n?/g, "\n");
+    const rewritten = rewriteText(original, publicUrl);
+    if (original === rewritten) continue;
+
+    for (const algorithm of algorithms) {
+      const originalHash = await hashInlineScript(original, algorithm);
+      if (!authorizedHashes.has(originalHash)) continue;
+      replacements.set(originalHash, await hashInlineScript(rewritten, algorithm));
+    }
+  }
+  if (replacements.size === 0) return;
+
+  for (const headerName of headerNames) {
+    const policy = headers.get(headerName);
+    if (!policy) continue;
+    headers.set(headerName, policy.split(";").map((directive) => {
+      const name = directive.trim().split(/\s+/, 1)[0].toLowerCase();
+      if (!scriptDirectives.has(name)) return directive;
+      return directive.replace(/'sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}'/g,
+        (source) => replacements.get(source) || source);
+    }).join(";"));
+  }
+}
+
+async function hashInlineScript(text, algorithm) {
+  const digest = await crypto.subtle.digest(`SHA-${algorithm}`, new TextEncoder().encode(text));
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  return `'sha${algorithm}-${base64}'`;
 }
 
 function rewriteContentSecurityPolicy(policy, publicUrl) {

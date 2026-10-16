@@ -95,6 +95,16 @@ https://git.example.com/healthy
 - 浏览器网络面板中的 GitHub 静态资源应使用 `/_proxy/` 路径
 - 测试公开仓库的 Raw、Download ZIP、Clone 和 Fetch
 
+## 分流诊断
+
+在浏览器中访问 `/__fastgit/diagnostics`，查看 `country`、`countrySource`、`proxyCountries`、`route` 和 `reason`：
+
+- `route=direct`：普通请求跳转 GitHub；`route=proxy`：请求继续走镜像。
+- `reason=split-disabled`：`PROXY_COUNTRIES=*` 关闭了分流。
+- `reason=country-unknown`：没有识别到有效地区，保留代理；检查站点是否已开启添加访问者位置标头，以及请求中是否有 `ali-ip-country`。
+
+普通响应包含 `X-FastGit-Country`、`X-FastGit-Proxy-Countries`、`X-FastGit-Route` 标头。诊断端点和健康页不随海外分流跳转。
+
 ## 注意事项
 
 - 公开实例建议不设置 `ALLOW_LOGIN`，或将其设为 `false`
