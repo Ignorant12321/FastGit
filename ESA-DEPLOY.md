@@ -77,6 +77,7 @@
 | `ALLOW_LOGIN` | `false` | `true` 开启登录；`false` 或删除变量则关闭 |
 | `SOURCE_REPOSITORY` | `ZhangShengFan/FastGit` | 健康页版本来源，格式为 `用户名/仓库名` |
 | `CACHE_TTL` | `3600` | 静态资源缓存秒数，`0` 关闭缓存，最大 `86400` |
+| `PROXY_COUNTRIES` | `CN` | 逗号分隔的国家/地区代码，仅这些地区走代理，其余直接跳转 GitHub；`*` 表示全部走代理 |
 
 登录关闭时访问 `/login` 会显示“登录未开放”页面，并返回 HTTP `403`。
 
@@ -97,6 +98,7 @@ https://git.example.com/healthy
 ## 注意事项
 
 - 公开实例建议不设置 `ALLOW_LOGIN`，或将其设为 `false`
+- 分流依赖站点开启**添加访问者位置标头**（站点管理 → 规则 → 托管转换，注入 `ali-ip-country`），否则读不到访客国家，所有人都会走代理
 - 派生项目应在仪表盘将 `SOURCE_REPOSITORY` 改为自己的仓库
 - ESA 的公共预览域名只适合临时测试
 - GitHub 接口仍有请求频率限制

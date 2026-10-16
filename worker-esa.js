@@ -4,6 +4,7 @@
 const DEFAULT_ALLOW_LOGIN = false;
 const DEFAULT_SOURCE_REPOSITORY = "ZhangShengFan/FastGit";
 const DEFAULT_CACHE_TTL = 3600;
+const DEFAULT_PROXY_COUNTRIES = "CN";
 const PRIMARY_HOST = "github.com";
 const PROXY_PREFIX = "/_proxy/";
 const STATIC_CACHE_HOSTS = new Set(["github.githubassets.com"]);
@@ -39,7 +40,8 @@ export default {
       const loginEnabled = readBoolean(getEnvironmentValue("ALLOW_LOGIN"), DEFAULT_ALLOW_LOGIN);
       const sourceRepository = readRepository(getEnvironmentValue("SOURCE_REPOSITORY"), DEFAULT_SOURCE_REPOSITORY);
       const cacheTtl = readInteger(getEnvironmentValue("CACHE_TTL"), DEFAULT_CACHE_TTL, 0, 86400);
-      return await proxyRequest(request, { loginEnabled, sourceRepository, cacheTtl });
+      const proxyCountries = readCountries(getEnvironmentValue("PROXY_COUNTRIES"), DEFAULT_PROXY_COUNTRIES);
+      return await proxyRequest(request, { loginEnabled, sourceRepository, cacheTtl, proxyCountries });
     } catch (error) {
       const errorId = createErrorId();
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -90,8 +92,20 @@ function readInteger(value, fallback, min, max) {
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
 }
 
+// Parses a comma separated list of ISO 3166-1 alpha-2 codes.
+// Returns null to mean "proxy every visitor" (feature disabled).
+function readCountries(value, fallback) {
+  const raw = String(value ?? fallback).trim();
+  if (raw === "*") return null;
+  const countries = raw
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+  return countries.length > 0 ? new Set(countries) : null;
+}
+
 async function proxyRequest(request, settings) {
-  const { loginEnabled, sourceRepository, cacheTtl } = settings;
+  const { loginEnabled, sourceRepository, cacheTtl, proxyCountries } = settings;
   const publicUrl = new URL(request.url);
 
   if (publicUrl.pathname === "/healthy") {
@@ -104,10 +118,17 @@ async function proxyRequest(request, settings) {
     return createLoginDisabledResponse();
   }
 
+  if (shouldRedirectUpstream(request, proxyCountries)) {
+    return createDirectRedirect(upstreamUrl, request.method);
+  }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.delete("Host");
   requestHeaders.delete("CF-Connecting-IP");
   requestHeaders.delete("CF-IPCountry");
+  requestHeaders.delete("Ali-Ip-Country");
+  requestHeaders.delete("Ali-Ip-City");
+  requestHeaders.delete("Ali-Real-Client-Ip");
   requestHeaders.delete("CF-Ray");
   requestHeaders.delete("CF-Visitor");
   requestHeaders.delete("X-Forwarded-For");
@@ -464,6 +485,42 @@ function isGithubHost(hostname) {
 
 function isLoginPath(pathname) {
   return /^\/(?:login|session|sessions|signup|password_reset)(?:\/|$)/.test(pathname);
+}
+
+// Whether the visitor should skip the mirror and be sent to the real upstream.
+// proxyCountries === null disables the split; unknown countries stay proxied.
+function shouldRedirectUpstream(request, proxyCountries) {
+  if (!proxyCountries) return false;
+  const upgrade = request.headers.get("Upgrade");
+  if (upgrade && upgrade.toLowerCase() === "websocket") return false;
+  const country = getClientCountry(request);
+  if (!country || country === "XX") return false;
+  return !proxyCountries.has(country);
+}
+
+function getClientCountry(request) {
+  let country = "";
+  if (request.cf && typeof request.cf.country === "string") country = request.cf.country;
+  if (!country) {
+    country =
+      request.headers.get("cf-ipcountry") ||
+      request.headers.get("ali-ip-country") ||
+      request.headers.get("x-client-country") ||
+      "";
+  }
+  return String(country).trim().toUpperCase();
+}
+
+function createDirectRedirect(upstreamUrl, method) {
+  const status = method === "GET" || method === "HEAD" ? 302 : 307;
+  return new Response(null, {
+    status,
+    headers: {
+      Location: upstreamUrl.toString(),
+      "Cache-Control": "no-store",
+      "X-FastGit-Direct": "redirect",
+    },
+  });
 }
 
 async function buildResponse(upstreamResponse, publicUrl, upstreamUrl, method) {

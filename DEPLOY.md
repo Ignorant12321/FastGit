@@ -70,8 +70,11 @@ https://你的-Worker.你的子域.workers.dev/healthy
 | `ALLOW_LOGIN` | `false` | `true` 开启登录；`false` 或删除变量则关闭 |
 | `SOURCE_REPOSITORY` | `ZhangShengFan/FastGit` | 健康页版本来源，格式为 `用户名/仓库名` |
 | `CACHE_TTL` | `3600` | 静态资源缓存秒数，`0` 关闭缓存，最大 `86400` |
+| `PROXY_COUNTRIES` | `CN` | 逗号分隔的国家/地区代码，仅这些地区走代理，其余直接跳转 GitHub；`*` 表示全部走代理 |
 
 登录关闭时访问 `/login` 会显示“登录未开放”页面，并返回 HTTP `403`。
+
+`PROXY_COUNTRIES` 默认 `CN`：国内访客走镜像代理，海外访客直接跳转真实 GitHub。设为 `*` 可关闭分流，让所有访客都走代理。
 
 ## 绑定自定义域名
 
