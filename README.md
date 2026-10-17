@@ -12,11 +12,25 @@
 
 **[📖 Cloudflare 部署教程](DEPLOY.md)　·　[📖 阿里云 ESA 部署教程](ESA-DEPLOY.md)**
 
-</div>
-
 ---
 
 ## 功能特性
+
+首页
+
+![image-20261017204230994](README.assets/image-20261017204230994.png)
+
+历史记录
+
+![image-20261017204257511](README.assets/image-20261017204257511.png)
+
+GitHub加速
+
+![image-20261017205243372](README.assets/image-20261017205243372.png)
+
+可以设置登录验证Access
+
+![image-20261017204930240](README.assets/image-20261017204930240.png)
 
 | 功能 | 说明 |
 |------|------|
