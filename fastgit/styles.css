@@ -61,7 +61,7 @@ html[data-theme="light"] {
 
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scrollbar-gutter: stable; }
 /* scrollbar-gutter: 预留滚动条位置 —— 页面从「不可滚动」变成「可滚动」时
-   （比如刚打开下拉面板、或第一次出现最近使用），内容不会横向跳一下。 */
+   （比如刚打开下拉面板、或第一次出现最近访问），内容不会横向跳一下。 */
 
 body {
   margin: 0;
@@ -171,6 +171,20 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
 .nav a:active { transform: scale(.94); }
 .nav-ico { display: none; }   /* 窄屏才用图标形态 */
 
+/* 换节点：新地址从右往左被撕开（clip 边从右端一路走到左端），
+   箭头沿同一方向晚 90ms 跟上来，两件事看起来是同一个动作。
+   span 不用 forwards，动画结束后 clip-path 直接回到无裁剪，不会一直压着盒子。 */
+#navNode.is-swap > span { animation: host-tear .34s cubic-bezier(.2, 0, 0, 1); }
+#navNode.is-swap > svg  { animation: host-slide .3s var(--ease) .09s both; }
+@keyframes host-tear {
+  from { clip-path: inset(0 0 0 100%); transform: translateX(8px); }
+  to   { clip-path: inset(0 0 0 0);    transform: none; }
+}
+@keyframes host-slide {
+  from { opacity: 0; transform: translateX(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
 /* 主题按钮：图标缩放旋转着换成另一个 */
 .icon-btn {
   position: relative;
@@ -185,36 +199,61 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-hi); }
 .icon-btn:active { transform: scale(.92); }
 
-.icon-btn svg {
-  grid-area: 1 / 1;
-  transition: transform .24s var(--ease), opacity .24s var(--ease);
-  animation: icon-in .5s var(--ease);
+/* 图标外面包一层，这层才是 View Transition 的独立分组：
+   两枚 svg 用 display 互换，组里就是「旧月亮 / 新太阳」两张快照，
+   可以各自淡出淡入。直接命名单个 svg 时快照对不上，看起来就是瞬间跳变。 */
+.theme-ico {
+  display: grid;
+  view-transition-name: theme-toggle-icon;
 }
+.theme-ico svg { grid-area: 1 / 1; }
 .icon-btn .i-sun { display: none; }
 html[data-theme="light"] .icon-btn .i-moon { display: none; }
 html[data-theme="light"] .icon-btn .i-sun { display: block; }
 
-.icon-btn.is-swapping svg {
-  animation: none;
-  transform: rotate(150deg) scale(.3);
-  opacity: 0;
-}
-@keyframes icon-in {
-  from { transform: rotate(-150deg) scale(.3); opacity: 0; }
-  to   { transform: none; opacity: 1; }
-}
-/* 切到浅色时，太阳旋转着展开 */
-html[data-theme="light"] .icon-btn:not(.is-swapping) .i-sun { animation: sun-in .55s var(--ease); }
-@keyframes sun-in {
-  from { transform: rotate(-210deg) scale(.2); opacity: 0; }
-  to   { transform: none; opacity: 1; }
+/* 只在不支持 View Transitions 的浏览器里用到：图标原地转一圈 */
+.anim-rotate { animation: icon-spin .5s ease-in-out; }
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-/* 深浅色切换：圆形扩散 */
+/* 深浅色切换：以按钮为圆心的圆形扩散。
+   扩散曲线走 CSS 变量，省掉 JS 等 ready 再启动动画的那一帧延迟。 */
+@property --theme-reveal-x { syntax: '<length>'; inherits: true; initial-value: 50vw; }
+@property --theme-reveal-y { syntax: '<length>'; inherits: true; initial-value: 50vh; }
+@property --theme-reveal-r { syntax: '<length>'; inherits: true; initial-value: 150vmax; }
+
 ::view-transition-old(root),
 ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-old(root) { z-index: 1; }
-::view-transition-new(root) { z-index: 2; }
+::view-transition-new(root) {
+  z-index: 2;
+  clip-path: circle(0 at var(--theme-reveal-x) var(--theme-reveal-y));
+  animation: theme-circle-reveal .55s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+@keyframes theme-circle-reveal {
+  to { clip-path: circle(var(--theme-reveal-r) at var(--theme-reveal-x) var(--theme-reveal-y)); }
+}
+
+/* 旧新两张快照跑同一条自转：新快照画在旧快照之上，观感就是"这一个图标
+   转着转着变成了另一个"，和脚下撑开的扩散是同一个节奏。前提是名字挂在
+   .theme-ico 这层 span 上；挂在 svg 本身时组建不起来，就只剩瞬间替换。 */
+::view-transition-old(theme-toggle-icon),
+::view-transition-new(theme-toggle-icon) {
+  animation: icon-spin .5s ease-in-out;
+  mix-blend-mode: normal;
+  height: 100%;
+  overflow: clip;
+}
+::view-transition-group(theme-toggle-icon) { z-index: 3; animation-duration: .5s; }
+
+/* 扩散期间冻结全站 transition：否则快照揭开时卡片阴影、翻页位移这些
+   还在跑，扩散完了页面又自己变一遍，看着就是两段动画。 */
+html.theme-no-transition,
+html.theme-no-transition *,
+html.theme-no-transition *::before,
+html.theme-no-transition *::after { transition: none !important; }
 
 /* ------------------------------------------------------------------- hero */
 
@@ -230,7 +269,7 @@ main {
 .hero {
   width: min(var(--shell), 100% - 48px);
   margin: 0 auto;
-  flex: 1 1 auto;                  /* 占满 main，把「最近使用」挤到最下面 */
+  flex: 1 1 auto;                  /* 占满 main，把「最近访问」挤到最下面 */
   display: flex;
   flex-direction: column;
   align-items: center;             /* 横向各自按内容宽度居中（否则会被拉满一整行） */
@@ -586,7 +625,7 @@ kbd {
 
 /* ----------------------------------------------------------- recent */
 
-/* --------------------------------------------- 最近使用（独立一页，滑入） */
+/* --------------------------------------------- 最近访问（独立一页，滑入） */
 
 .page-recent {
   position: fixed;
@@ -783,7 +822,7 @@ body.is-recent { overflow: hidden; }
   .site-header { gap: 12px; padding: 16px 0; }
   .brand { margin-right: auto; }
 
-  /* 窄屏：导航只留「最近使用」，收成和主题按钮一样的方形图标按钮 */
+  /* 窄屏：导航只留「最近访问」，收成和主题按钮一样的方形图标按钮 */
   .nav { display: flex; gap: 10px; margin-left: 0; }
   .nav .nav-ext { display: none; }             /* 代理地址太长，窄屏不占位置（.nav a 权重更高，要带上 .nav） */
   #navRecent {
@@ -827,5 +866,11 @@ body.is-recent { overflow: hidden; }
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
+  }
+  /* 上面的 * 匹配不到 view transition 的伪元素，要单独压掉 */
+  ::view-transition-new(root),
+  ::view-transition-old(theme-toggle-icon),
+  ::view-transition-new(theme-toggle-icon) {
+    animation-duration: .01ms !important;
   }
 }

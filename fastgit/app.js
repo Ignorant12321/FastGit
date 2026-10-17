@@ -105,34 +105,66 @@
     applyTheme(saved === 'light' || saved === 'dark' ? saved : (prefersLight.matches ? 'light' : 'dark'));
   })();
 
-  /* 图标缩放旋转着换成另一个 + 整页圆形扩散 */
-  el.themeToggle.addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    const btn = el.themeToggle;
+  /* 图标自转 + 整页圆形扩散：扩散由 CSS 变量驱动的 @keyframes 完成，点击后立即开始 */
+  let themeTransition = null;
 
-    btn.classList.add('is-swapping');
+  el.themeToggle.addEventListener('click', (event) => {
+    const root = document.documentElement;
+    const btn = event.currentTarget;
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    const r = btn.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const radius = Math.ceil(Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    ));
 
-    setTimeout(() => {
-      const swap = () => {
-        applyTheme(next);
-        btn.classList.remove('is-swapping');
+    root.style.setProperty('--theme-reveal-x', `${Math.round(x)}px`);
+    root.style.setProperty('--theme-reveal-y', `${Math.round(y)}px`);
+    root.style.setProperty('--theme-reveal-r', `${radius}px`);
+
+    let applied = false;
+    const applyUpdate = () => {
+      applied = true;
+      applyTheme(next);
+    };
+
+    const spinIcon = () => {
+      const icon = Array.from(btn.children).find(n => n.nodeType === 1 && n.offsetParent !== null);
+      if (!icon) return;
+      icon.classList.remove('anim-rotate');
+      void icon.offsetWidth;
+      icon.classList.add('anim-rotate');
+    };
+
+    const fallback = () => {
+      spinIcon();
+      applyUpdate();
+    };
+
+    if (typeof document.startViewTransition !== 'function') { fallback(); return; }
+
+    if (themeTransition) {
+      try { themeTransition.skipTransition(); } catch (err) {}
+      themeTransition = null;
+    }
+
+    root.classList.add('theme-no-transition');
+    try {
+      const transition = document.startViewTransition(applyUpdate);
+      themeTransition = transition;
+      const settle = () => {
+        if (themeTransition === transition) themeTransition = null;
+        root.classList.remove('theme-no-transition');
+        if (!applied) applyUpdate();
       };
-
-      if (typeof document.startViewTransition !== 'function') { swap(); return; }
-
-      const r = btn.getBoundingClientRect();
-      const x = r.left + r.width / 2;
-      const y = r.top + r.height / 2;
-      const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
-
-      const transition = document.startViewTransition(swap);
-      transition.ready.then(() => {
-        document.documentElement.animate(
-          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-          { duration: 560, easing: 'cubic-bezier(.22, 1, .36, 1)', pseudoElement: '::view-transition-new(root)' }
-        );
-      }).catch(() => {});
-    }, 230);
+      transition.finished.then(settle, settle);
+      transition.ready.catch(() => {});
+    } catch (err) {
+      root.classList.remove('theme-no-transition');
+      fallback();
+    }
   });
 
   /* --------------------------------------------------------- 节点管理 */
@@ -183,12 +215,20 @@
     if (!silent) toast(`已切换到 ${host}`);
   }
 
+  let lastNavHost = null;
+
   function syncNodeUI() {
     el.nodeHost.textContent = currentHost;
     el.navNodeHost.textContent = currentHost;
     el.navNode.href = baseURL();
     // 选中的节点就是本站时，右上角的外链没有意义，收起它
     el.navNode.hidden = Boolean(SELF_HOST) && currentHost === SELF_HOST;
+    if (lastNavHost !== null && lastNavHost !== currentHost) {
+      el.navNode.classList.remove('is-swap');
+      void el.navNode.offsetWidth;
+      el.navNode.classList.add('is-swap');
+    }
+    lastNavHost = currentHost;
     renderNodeList();
   }
 
@@ -478,7 +518,7 @@
       // 只用不触发权限提示的传统复制，绝不在这里调用 clipboard API
       toast('新标签页被拦截，加速链接已复制', true);
     } else {
-      toast('新标签页被拦截，可在下方「最近使用」里复制或打开', true);
+      toast('新标签页被拦截，可在下方「最近访问」里复制或打开', true);
     }
   }
 
@@ -518,7 +558,7 @@
       el.input.select();
     }
     if (e.key === 'Escape') {
-      if (recentPageOpen()) { clearHash(); return; }   // 先退「最近使用」这一页
+      if (recentPageOpen()) { clearHash(); return; }   // 先退「最近访问」这一页
       if (nodePopOpen()) { closeNodePop(); return; }
       if (document.activeElement === el.input) el.input.blur();
     }
@@ -674,7 +714,7 @@
     toast('已清空本地记录');
   });
 
-  /* ------------------------------------ 最近使用：独立一页 + 滑入过渡 */
+  /* ------------------------------------ 最近访问：独立一页 + 滑入过渡 */
 
   function recentPageOpen() {
     return el.recent.classList.contains('is-open');
@@ -715,7 +755,7 @@
     el.recent.setAttribute('aria-hidden', open ? 'false' : 'true');
   }
 
-  /** 退出「最近使用」这一页时清掉地址栏的 hash。
+  /** 退出「最近访问」这一页时清掉地址栏的 hash。
       收尾用 replaceState，否则 `location.hash = ''` 会在地址栏留下一个裸露的 #。
       （局部数组变量 `history` 会遮蔽全局，所以这里显式写 window.history。） */
   function clearHash() {
@@ -731,7 +771,7 @@
 
   el.recentBack.addEventListener('click', clearHash);
 
-  // 已经在这一页时，再点「最近使用」就收回去（默认行为只是重复设同一个 hash，不会触发切换）
+  // 已经在这一页时，再点「最近访问」就收回去（默认行为只是重复设同一个 hash，不会触发切换）
   el.navRecent.addEventListener('click', (e) => {
     if (!recentPageOpen()) return;
     e.preventDefault();
