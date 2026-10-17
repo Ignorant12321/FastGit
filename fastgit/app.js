@@ -429,10 +429,12 @@
   /* ------------------------------------------------------------ 主流程 */
 
   function showError(message) {
-    el.field.classList.add('is-error');
     el.error.textContent = message;
     el.error.hidden = false;
-    setTimeout(() => el.field.classList.remove('is-error'), 460);
+    /* 报错期间保持红色：边框与聚焦光晕一起变红，直到 clearError 才恢复 */
+    el.field.classList.remove('is-error');
+    void el.field.offsetWidth; /* 强制重排，让连续报错也能重播抖动动画 */
+    el.field.classList.add('is-error');
   }
 
   function clearError() {
@@ -448,7 +450,7 @@
 
     if (!res.ok) {
       const messages = {
-        empty: '先粘贴一条 GitHub 链接吧。',
+        empty: '先粘贴一条 GitHub 链接吧！',
         scheme: '无法识别的地址，请以 github.com/… 或 https:// 开头。',
         invalid: '这个地址看起来不太对，请检查后重试。',
         host: `只支持 GitHub 域名，当前是 ${res.host || '未知域名'}。`,

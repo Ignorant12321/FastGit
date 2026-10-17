@@ -152,7 +152,8 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
   padding: 22px 0;
 }
 
-.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.02em; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.02em; transition: transform .18s var(--ease); }
+.brand:active { transform: scale(.96); }
 .brand-mark {
   display: grid; place-items: center;
   width: 28px; height: 28px;
@@ -165,8 +166,9 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
 .brand-text em { font-style: normal; color: var(--text-dim); }
 
 .nav { display: flex; align-items: center; gap: 22px; margin-left: auto; font-size: .875rem; color: var(--text-dim); }
-.nav a { display: inline-flex; align-items: center; gap: 5px; transition: color .18s var(--ease); }
+.nav a { display: inline-flex; align-items: center; gap: 5px; transition: color .18s var(--ease), transform .18s var(--ease); }
 .nav a:hover { color: var(--text); }
+.nav a:active { transform: scale(.94); }
 .nav-ico { display: none; }   /* 窄屏才用图标形态 */
 
 /* 主题按钮：图标缩放旋转着换成另一个 */
@@ -178,9 +180,10 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
   border-radius: 10px;
   background: var(--surface);
   color: var(--text-dim);
-  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
 }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-hi); }
+.icon-btn:active { transform: scale(.92); }
 
 .icon-btn svg {
   grid-area: 1 / 1;
@@ -198,6 +201,12 @@ html[data-theme="light"] .icon-btn .i-sun { display: block; }
 }
 @keyframes icon-in {
   from { transform: rotate(-150deg) scale(.3); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+/* 切到浅色时，太阳旋转着展开 */
+html[data-theme="light"] .icon-btn:not(.is-swapping) .i-sun { animation: sun-in .55s var(--ease); }
+@keyframes sun-in {
+  from { transform: rotate(-210deg) scale(.2); opacity: 0; }
   to   { transform: none; opacity: 1; }
 }
 
@@ -335,11 +344,13 @@ main {
 }
 .node:hover { background: var(--surface-hi); color: var(--text); }
 .node-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-caret { flex: 0 0 auto; transition: transform .25s var(--ease); }
+.node-caret { flex: 0 0 auto; transition: transform .34s cubic-bezier(.34, 1.4, .64, 1); }
 .node[aria-expanded="true"] .node-caret { transform: rotate(180deg); }
 
 .field.is-error {
   border-color: color-mix(in srgb, var(--danger) 65%, transparent);
+  /* 出错时连聚焦光晕一起变红（否则仍是 :focus-within 的蓝色光圈） */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent), var(--shadow-lg);
   animation: shake .42s var(--ease);
 }
 @keyframes shake {
@@ -402,7 +413,9 @@ main {
   animation: pop-in .24s var(--ease);
   transition: color .15s var(--ease), background .15s var(--ease);
 }
+.clear svg { transition: transform .25s var(--ease); }
 .clear:hover { color: var(--text); background: var(--surface-hi); }
+.clear:hover svg { transform: rotate(90deg); }
 @keyframes pop-in {
   from { opacity: 0; transform: scale(.7); }
   to   { opacity: 1; transform: none; }
@@ -420,8 +433,10 @@ main {
 }
 .go:hover { background: var(--accent-hi); transform: scale(1.06); }
 .go:active { transform: scale(.94); }
-.go svg { transition: transform .28s var(--ease); }
-.go:hover svg { transform: translateX(2px); }
+.go svg { transition: transform .34s var(--ease); }
+/* 上箭头（↑）悬浮时顺时针转 90° 变为正右箭头（→），同时略微放大；按下回落并缩小 */
+.go:hover svg { transform: rotate(90deg) scale(1.08); }
+.go:active svg { transform: rotate(90deg); }
 html[data-theme="light"] .go:hover { background: color-mix(in srgb, var(--accent) 82%, #000); }
 
 /* 节点下拉面板 */
@@ -545,7 +560,7 @@ html[data-theme="light"] .go:hover { background: color-mix(in srgb, var(--accent
   margin: 12px 4px 0;
   font-size: .84rem;
   color: var(--danger);
-  text-align: left;
+  text-align: center;
   animation: err-in .3s var(--ease);
 }
 @keyframes err-in {
@@ -643,6 +658,8 @@ body.is-recent { overflow: hidden; }
 .back svg { color: var(--accent); transition: transform .22s var(--ease); }
 .back:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); }
 .back:hover svg { transform: translateX(-2px); }
+.back:active { transform: scale(.96); }
+.back:active svg { transform: translateX(-2px); }
 .back:focus-visible { border-radius: 999px; }   /* 全局 :focus-visible 会把圆角压成 4px，这里圆角保持胶囊形 */
 
 .page-sub { margin-top: 12px; font-size: .78rem; color: var(--text-faint); }
@@ -660,15 +677,25 @@ body.is-recent { overflow: hidden; }
   display: inline-flex; align-items: center; gap: 6px;
   font-size: .8rem;
   color: var(--text-faint);
-  transition: color .18s var(--ease);
+  transition: color .18s var(--ease), transform .18s var(--ease);
 }
 .text-btn:hover { color: var(--danger); }
+.text-btn:active { transform: scale(.94); }
 
 .recent-list { margin-top: 18px; border-top: 1px solid var(--border); }
 .recent-item {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 4px;
   border-bottom: 1px solid var(--border);
+  transition: translate .2s var(--ease), background .2s var(--ease), box-shadow .2s var(--ease), border-radius .2s var(--ease), border-color .2s var(--ease);
+}
+/* 悬浮时轻微上抬 + 阴影，强调可点（用 translate 避开 row-in 动画对 transform 的占用） */
+.recent-item:hover {
+  translate: 0 -2px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  border-radius: 12px;
+  border-bottom-color: transparent;
 }
 /* 只有最新插入的那一条入场，其余保持不变，避免整列表重播动画 */
 .recent-item.is-new { animation: row-in .42s var(--ease) both; }
@@ -691,8 +718,10 @@ body.is-recent { overflow: hidden; }
   flex: 0 0 auto;
   display: inline-flex; align-items: center; gap: 4px;
   font-size: .75rem; color: var(--text-faint);
+  transition: color .18s var(--ease), transform .18s var(--ease);
 }
 .r-more:hover { color: var(--accent-hi); }
+.r-more:active { transform: scale(.94); }
 
 .copy {
   flex: 0 0 auto;
@@ -703,11 +732,13 @@ body.is-recent { overflow: hidden; }
   background: var(--surface-hi);
   font-size: .8rem;
   color: var(--text);
-  transition: background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease);
+  transition: background .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease);
   white-space: nowrap;
 }
 .copy:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.copy:active { transform: scale(.95); }
 .copy.is-done { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 55%, transparent); background: color-mix(in srgb, var(--signal) 14%, transparent); }
+.copy.is-done svg { animation: pop-in .3s var(--ease); }
 
 /* ------------------------------------------------------------------ toast */
 
