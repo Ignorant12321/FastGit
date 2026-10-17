@@ -5,6 +5,8 @@
 **部署一个边缘函数，把 `github.com` 换成你自己的域名即可访问。**  
 网页、静态资源、Raw 文件、Release 附件、仓库压缩包，以及 Git Smart HTTP 请求全部走镜像代理。
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Ignorant12321/FastGit)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Cloudflare Workers](https://img.shields.io/badge/Runtime-Cloudflare_Workers-f6821f.svg?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
 [![阿里云 ESA](https://img.shields.io/badge/Runtime-阿里云_ESA-FF6A00.svg?logo=alibabacloud&logoColor=white)](https://www.aliyun.com/product/esa)
@@ -31,6 +33,10 @@
 GitHub加速
 
 ![image-20261017205243372](README.assets/image-20261017205243372.png)
+
+深色模式切换
+
+![image-20261018003221159](README.assets/image-20261018003221159.png)
 
 可以设置登录验证Access
 
@@ -230,6 +236,19 @@ GitHub 前端路由需要浏览器路径与页面的 `initial-path` 一致。直
 当前边缘缓存仅覆盖 `github.githubassets.com` 的静态资源，默认 `CACHE_TTL=3600`。头像、仓库 HTML、异步数据接口不在此缓存范围内。可通过 `X-Mirror-Cache: HIT` / `MISS` 查看符合条件的资源是否命中边缘缓存。
 
 文本替换和 CSP 哈希计算会消耗 CPU，大型 JS 在缓存未命中时需要完整读取并改写。建议保留静态缓存，日常使用标准仓库路径，并在 Cloudflare Dashboard 观察请求数、CPU 时间和超限错误。实际容量取决于每页资源数量、浏览器缓存与访问行为，不保证固定的每日页面访问量。
+
+### 前端更新至js文件
+
+```cmd
+# 1. 改完 fastgit/ 里任何一个文件之后
+node tools/embed-fastgit.mjs
+
+# 2. 语法 + 测试
+node --check worker-cloudflare.js && node --check worker-esa.js
+node --test tests/worker-csp.test.mjs tests/worker-routing.test.mjs
+```
+
+
 
 ---
 
