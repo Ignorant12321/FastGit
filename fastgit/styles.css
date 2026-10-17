@@ -165,7 +165,7 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
 .brand-text { font-size: 1.02rem; }
 .brand-text em { font-style: normal; color: var(--text-dim); }
 
-.nav { display: flex; align-items: center; gap: 22px; margin-left: auto; font-size: .875rem; color: var(--text-dim); }
+.nav { --nav-gap: 22px; display: flex; align-items: center; gap: var(--nav-gap); margin-left: auto; font-size: .875rem; color: var(--text-dim); }
 .nav a { display: inline-flex; align-items: center; gap: 5px; transition: color .18s var(--ease), transform .18s var(--ease); }
 .nav a:hover { color: var(--text); }
 .nav a:active { transform: scale(.94); }
@@ -183,6 +183,24 @@ html[data-theme="light"] .grid-lines { opacity: .95; }
 @keyframes host-slide {
   from { opacity: 0; transform: translateX(9px); }
   to   { opacity: 1; transform: none; }
+}
+
+/* 选中节点就是本站时，右上角外链没有意义要收起来。但 hidden 是 display:none，
+   打上就整帧消失，动画根本没地方演 —— 所以先按实测宽度（--nav-w 由 app.js 写入）
+   把盒子压到 0，margin-right 抵掉 .nav 的 gap，动画放完 JS 才补 hidden。
+   展开是反方向，配 is-swap 一起用：盒子撑开的同时域名撕开。
+   收拢要 forwards（撑到动画结束都得一直是 0 宽），展开不能 forwards（否则长域名会被上次的宽度夹住）。 */
+#navNode.is-tuck   { overflow: hidden; animation: nav-tuck   .3s var(--ease) forwards; }
+#navNode.is-untuck { overflow: hidden; animation: nav-untuck .34s var(--ease); }
+/* 宽度被压小时，域名的点号是断行点，不换行、不被压扁才是一道干净的擦除而不是文字重排 */
+#navNode.is-tuck > span, #navNode.is-untuck > span { flex: 0 0 auto; white-space: nowrap; }
+@keyframes nav-tuck {
+  from { max-width: var(--nav-w); margin-right: 0; opacity: 1; }
+  to   { max-width: 0; margin-right: calc(var(--nav-gap) * -1); opacity: 0; }
+}
+@keyframes nav-untuck {
+  from { max-width: 0; margin-right: calc(var(--nav-gap) * -1); opacity: 0; }
+  to   { max-width: var(--nav-w); margin-right: 0; opacity: 1; }
 }
 
 /* 主题按钮：图标缩放旋转着换成另一个 */
@@ -823,7 +841,7 @@ body.is-recent { overflow: hidden; }
   .brand { margin-right: auto; }
 
   /* 窄屏：导航只留「最近访问」，收成和主题按钮一样的方形图标按钮 */
-  .nav { display: flex; gap: 10px; margin-left: 0; }
+  .nav { --nav-gap: 10px; display: flex; margin-left: 0; }
   .nav .nav-ext { display: none; }             /* 代理地址太长，窄屏不占位置（.nav a 权重更高，要带上 .nav） */
   #navRecent {
     display: grid; place-items: center;

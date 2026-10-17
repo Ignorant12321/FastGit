@@ -43,7 +43,7 @@
 - **节点面板开合位置**：`app.js` 里的 `POP_GAP / POP_EDGE / POP_CHROME / POP_ROW`（面板高度按当前视口算：下方放得下就往下开，放不下就翻到输入框上方，始终不会把页面撑高）。
 - **「最近访问」的滑入动效**：`styles.css` 的 `.page-recent`（收起态是 `translateX(64px)` + `opacity 0`）和 `body.is-recent main`（首屏被推开多少：`translateX(-30px)`）。**两个方向的 `transition` 都带延迟，时序不要改反**：打开时首页先 `.18s` 淡出干净，这一页延迟 `.07s` 再滑入；关闭时这一页先淡掉（`.18s`），首页延迟 `.08s` 再淡回来 —— 否则两页会同时半透明，看起来是残影。窄屏顶栏只留一个时钟图标按钮，见 `styles.css` 底部 `@media (max-width: 600px)` 里 `#navRecent` 那几条。翻页用 hash（`#recent`），逻辑在 `app.js` 的 `setRecentPage / syncRecentFromHash / clearHash`。
 - **主题扩散动画时长**：`styles.css` 里 `::view-transition-new(root)` 的 `theme-circle-reveal .55s`（圆心和半径由 `app.js` 写成 `--theme-reveal-x/y/r` 三个变量，初值在文件里的 `@property`）；图标旋转时长是同文件的 `icon-spin .5s`，它同时是不支持 View Transitions 时 `.anim-rotate` 的退路。两个要点别动：`view-transition-name: theme-toggle-icon` 必须挂在 `.theme-ico` 那层 span（不是 svg），旧新两张快照跑**同一条**旋转、不加 opacity，才融成"一个图标转着变成另一个"；`html.theme-no-transition` 在扩散期间冻结全站 `transition`，删掉它扩散结束后页面会自己再变一遍。
-- **顶栏节点名的动效**：`app.js` 的 `syncNodeUI` 里给 `#navNode` 打 `is-swap`（首次加载不打，避免一进站就闪），动画在 `styles.css` 的 `host-tear`（域名从右往左撕开）+ `host-slide`（外链箭头晚 90ms 同方向跟上来）。
+- **顶栏节点名的动效**：`app.js` 的 `syncNodeUI` 里给 `#navNode` 打 `is-swap`（首次加载不打，避免一进站就闪），动画在 `styles.css` 的 `host-tear`（域名从右往左撕开）+ `host-slide`（外链箭头晚 90ms 同方向跟上来）。选中的节点就是本站时外链没有意义要收起，但 `hidden` 是 `display:none`，直接打上就没有任何过渡，所以先用 `nav-tuck` 按实测宽度（`--nav-w` 由 JS 写入）把盒子压到 0、`margin-right` 抵掉 `.nav` 的 gap（`--nav-gap`，两处要一起改），`NAV_TUCK_MS` 到点才补 `hidden`；切回代理节点时反过来演 `nav-untuck` 和 `is-swap` 同时跑（撑开盒子的同时撕开域名）。
 
 ## 说明
 

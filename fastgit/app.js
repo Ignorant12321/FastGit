@@ -47,6 +47,7 @@
   const POP_EDGE = 12;    // 距视口边缘留白
   const POP_CHROME = 104; // 面板固定部分：内边距 + 标题 + 添加行
   const POP_ROW = 42;     // 列表每行大约高度
+  const NAV_TUCK_MS = 320; // 与 styles.css 里 nav-tuck .3s 对应：外链收拢动画放完才补 hidden
 
   const ICON_COPY  = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
   const ICON_CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
@@ -216,19 +217,48 @@
   }
 
   let lastNavHost = null;
+  let navHideTimer = 0;
+
+  /** 外链整项收起来：hidden 是 display:none，直接打会跳过过渡，所以先演一段收拢再收起 */
+  function tuckNavNode() {
+    const nav = el.navNode;
+    // 实测宽度写进 --nav-w：用估算值的话，动画前半段会因为没有可见变化而空跑
+    nav.style.setProperty('--nav-w', `${nav.offsetWidth}px`);
+    nav.classList.add('is-tuck');
+    navHideTimer = setTimeout(() => {
+      navHideTimer = 0;
+      nav.hidden = true;
+      nav.classList.remove('is-tuck');
+    }, NAV_TUCK_MS);
+  }
 
   function syncNodeUI() {
     el.nodeHost.textContent = currentHost;
     el.navNodeHost.textContent = currentHost;
     el.navNode.href = baseURL();
+
+    const nav = el.navNode;
     // 选中的节点就是本站时，右上角的外链没有意义，收起它
-    el.navNode.hidden = Boolean(SELF_HOST) && currentHost === SELF_HOST;
-    if (lastNavHost !== null && lastNavHost !== currentHost) {
-      el.navNode.classList.remove('is-swap');
-      void el.navNode.offsetWidth;
-      el.navNode.classList.add('is-swap');
-    }
+    const isSelf = Boolean(SELF_HOST) && currentHost === SELF_HOST;
+    const changed = lastNavHost !== null && lastNavHost !== currentHost;
+    const wasTucked = nav.hidden;
     lastNavHost = currentHost;
+
+    clearTimeout(navHideTimer);
+    navHideTimer = 0;
+    nav.classList.remove('is-swap', 'is-tuck', 'is-untuck');
+
+    if (isSelf) {
+      // 首次进站（changed 为 false）直接收起，不放动画
+      if (changed && !wasTucked) tuckNavNode();
+      else nav.hidden = true;
+    } else {
+      nav.hidden = false;
+      if (wasTucked) nav.style.setProperty('--nav-w', `${nav.offsetWidth}px`);
+      void nav.offsetWidth;
+      if (changed) nav.classList.add('is-swap');
+      if (wasTucked) nav.classList.add('is-untuck');
+    }
     renderNodeList();
   }
 
