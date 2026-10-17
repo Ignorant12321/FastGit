@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastGit · 让 GitHub 下载不再等待</title>
+<meta name="description" content="粘贴任意 GitHub 仓库、Release 或 Raw 文件地址，通过可切换的公共加速节点直接打开加速链接。纯前端实现。">
+<meta name="color-scheme" content="dark light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236aa8ff'/><stop offset='1' stop-color='%231a4fd0'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><g transform='translate(7 7) scale(.75)'><path fill='%23fff' d='M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/></g></svg>">
+<!-- 站点图标来自 icones.js.org 的 simple-icons/github，换图标只需改这里和 .brand-mark 两处 -->
+</head>
+<body>
+
+<div class="backdrop" aria-hidden="true">
+  <div class="grid-lines"></div>
+  <div class="glow glow--a"></div>
+  <div class="glow glow--b"></div>
+</div>
+
+<header class="site-header">
+  <a class="brand" href="./">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+        <path d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+      </svg>
+    </span>
+    <span class="brand-text">Fast<em>Git</em></span>
+  </a>
+
+  <nav class="nav" aria-label="主导航">
+    <a id="navRecent" href="#recent">
+      <svg class="nav-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+      </svg>
+      <span>最近使用</span>
+    </a>
+    <a class="nav-ext" id="navNode" href="https://gh-proxy.com/" target="_blank" rel="noopener">
+      <span id="navNodeHost">gh-proxy.com</span>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+      </svg>
+    </a>
+  </nav>
+
+  <button class="icon-btn" id="themeToggle" type="button" aria-label="切换深色 / 浅色模式" title="切换深色 / 浅色">
+    <svg class="i-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
+    </svg>
+    <svg class="i-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </svg>
+  </button>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow reveal" style="--d:.05s">
+      <span class="pulse" aria-hidden="true"></span>
+      公共加速节点 · 可随时切换 · 支持自定义
+    </p>
+
+    <h1 class="reveal" style="--d:.12s">
+      让每一次 <span class="grad">GitHub</span> 访问<br class="br-lg">都不必等待
+    </h1>
+
+    <p class="lede reveal" style="--d:.19s">
+      粘贴仓库、Release 或 Raw 文件地址，直接在新标签页打开加速链接。
+    </p>
+
+    <form class="composer reveal" id="form" style="--d:.26s" novalidate>
+      <div class="field-wrap">
+        <div class="field" id="field">
+          <span class="lead" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor">
+              <path d="M15.914 4a1.5 1.5 0 0 0-2.474-1.561l-9 9A1.5 1.5 0 0 0 5.5 14h4.002a.5.5 0 0 1 .471.666L8.086 20a1.5 1.5 0 0 0 2.475 1.56l9-9A1.5 1.5 0 0 0 18.5 10h-3.997a.5.5 0 0 1-.472-.667z"/>
+            </svg>
+          </span>
+
+          <button class="node" id="nodeBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="切换加速节点">
+            <span class="node-host" id="nodeHost">gh-proxy.com</span>
+            <svg class="node-caret" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
+
+          <div class="input-wrap">
+            <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+                   aria-label="GitHub 链接" aria-describedby="hint">
+            <span class="ghost" id="ghost" aria-hidden="true"></span>
+          </div>
+
+          <button class="clear" id="clear" type="button" aria-label="清空输入" hidden>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+
+          <button class="go" id="go" type="submit" aria-label="加速并在新标签页打开" title="加速并在新标签页打开">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14m-7-7 7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="popover" id="nodePop" hidden>
+          <p class="pop-title">选择加速节点</p>
+          <ul class="node-list" id="nodeList" role="listbox" aria-label="加速节点"></ul>
+          <div class="node-add">
+            <input id="nodeAddInput" type="text" spellcheck="false" autocomplete="off"
+                   placeholder="自定义节点，如 gh-proxy.com" aria-label="添加自定义节点">
+            <button id="nodeAddBtn" type="button" aria-label="添加节点">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14m-7-7v14"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="error" id="error" role="alert" hidden></p>
+      <p class="hint" id="hint">
+        按 <kbd>Enter</kbd> 在新标签页打开 · <kbd id="kbdMod">Ctrl</kbd> <kbd>K</kbd> 聚焦输入框
+      </p>
+    </form>
+  </section>
+</main>
+
+<!-- 最近使用：独立一页，从右侧滑入盖住首页内容（顶栏保持不动） -->
+<section class="page-recent" id="recent" aria-labelledby="recentTitle" aria-hidden="true">
+  <div class="page-inner">
+    <div class="page-head">
+      <button class="back" id="recentBack" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5m7-7-7 7 7 7"/>
+        </svg>
+        <span>返回</span>
+      </button>
+
+      <h2 id="recentTitle">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+        最近使用
+      </h2>
+
+      <button class="text-btn" id="clearHistory" type="button">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+        </svg>
+        <span>清空记录</span>
+      </button>
+    </div>
+
+    <p class="page-sub" id="recentSub"></p>
+    <ul class="recent-list" id="recentList"></ul>
+    <p class="page-empty" id="recentEmpty" hidden>
+      还没有记录 —— 在这里打开过的加速链接会出现在这一页。
+    </p>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="./app.js"></script>
+</body>
+</html>

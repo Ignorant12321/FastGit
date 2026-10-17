@@ -54,7 +54,7 @@ https://你的-Worker.你的子域.workers.dev/
 https://你的-Worker.你的子域.workers.dev/healthy
 ```
 
-根路径应显示 GitHub 页面，`/healthy` 应显示 `OK`。
+根路径应显示 FastGit 加速首页，`/healthy` 应显示 `OK`。
 
 ## 仪表盘设置
 

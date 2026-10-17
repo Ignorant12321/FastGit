@@ -73,6 +73,36 @@ for (const filename of ["worker-cloudflare.js", "worker-esa.js"]) {
     assert.equal(response.headers.get("X-FastGit-Proxy-Countries"), "CN");
   });
 
+  await test(`${filename}: the root path serves the landing page instead of GitHub`, async (t) => {
+    for (const country of ["CN", "US"]) {
+      await t.test(country, async (t) => {
+        const { response, calls } = await invoke(t, "/", { country });
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get("Content-Type"), /text\/html/);
+        assert.equal(response.headers.get("X-FastGit-Route"), "local");
+        assert.equal(calls.length, 0);
+        assert.match(await response.text(), /<title>FastGit/);
+      });
+    }
+  });
+
+  await test(`${filename}: landing page assets are served locally`, async (t) => {
+    for (const [path, type] of [
+      ["/index.html", /text\/html/],
+      ["/styles.css", /text\/css/],
+      ["/app.js", /javascript/],
+    ]) {
+      await t.test(path, async (t) => {
+        const { response, calls } = await invoke(t, path, { country: "US" });
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get("Content-Type"), type);
+        assert.equal(response.headers.get("X-FastGit-Route"), "local");
+        assert.equal(calls.length, 0);
+        assert.ok((await response.text()).length > 0);
+      });
+    }
+  });
+
   await test(`${filename}: overseas visitors go directly to GitHub`, async (t) => {
     for (const method of ["GET", "HEAD", "POST"]) {
       await t.test(method, async (t) => {

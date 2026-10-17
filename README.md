@@ -20,7 +20,9 @@
 
 | 功能 | 说明 |
 |------|------|
-| GitHub 网页镜像 | 打开镜像域名即可访问 GitHub 官方界面 |
+| 加速首页 | 打开镜像域名显示 FastGit 首页，粘贴链接即可生成加速地址 |
+| 默认走本站 | 首页默认加速节点取当前域名，换成任何自定义域名都通用 |
+| GitHub 网页镜像 | 仓库路径显示 GitHub 官方界面 |
 | 静态资源代理 | 头像、图片、CSS/JS 等静态资源自动改写到镜像 |
 | Raw 文件代理 | `raw.githubusercontent.com` 内容通过镜像访问 |
 | Release 代理 | 版本发布附件、源码压缩包可正常下载 |
@@ -59,11 +61,15 @@ FastGit/
 ├── wrangler.jsonc           # Cloudflare Workers 部署配置
 ├── worker-esa.js            # 阿里云 ESA Pages 入口
 ├── esa.jsonc                # 阿里云 ESA Pages 构建配置
+├── fastgit/                 # 加速首页（index.html / styles.css / app.js）
+├── tools/embed-fastgit.mjs  # 把首页资源内联进两个 Worker 入口
 ├── DEPLOY.md                # Cloudflare Workers 部署教程
 ├── ESA-DEPLOY.md            # 阿里云 ESA Pages 部署教程
 ├── tests/                   # CSP 和路由分流回归测试
 └── LICENSE
 ```
+
+> 两个 Worker 入口是「整文件粘贴部署」的单文件形式，所以首页资源被内联在其中。修改 `fastgit/` 后运行 `node tools/embed-fastgit.mjs` 重新生成内联内容（`fastgit/` 本身仍可直接用浏览器打开做本地测试）。
 
 ---
 
@@ -79,6 +85,8 @@ FastGit/
 4. 点击 **Deploy**。
 5. 打开 `*.workers.dev` 地址验证是否可用，需要自定义域名参考 [DEPLOY.md](DEPLOY.md)。
 
+> 粘贴的是包含首页的完整单文件，部署后访问根路径即显示 FastGit 加速首页。
+
 ### 阿里云 ESA Pages
 
 1. 进入 ESA 控制台 **边缘计算和 AI** → **函数和 Pages**。
@@ -90,7 +98,9 @@ FastGit/
 
 ## 使用方式
 
-假设部署后的域名是 `git.example.com`，把链接里的 `github.com` 换成它即可：
+打开 `https://git.example.com/` 即是 FastGit 加速首页：粘贴链接、回车，即可在新标签页打开加速地址，默认节点就是当前域名（`gh-proxy.com` 作为备用节点保留）。
+
+也可以把链接里的 `github.com` 换成部署域名来直接访问：
 
 ```text
 GitHub：https://github.com/cloudflare/workers-sdk

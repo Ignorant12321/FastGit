@@ -90,7 +90,7 @@ https://git.example.com/
 https://git.example.com/healthy
 ```
 
-- 首页应显示 GitHub 页面
+- 首页应显示 FastGit 加速首页
 - `/healthy` 应显示 `OK` 和 7 位提交 SHA
 - 浏览器网络面板中的 GitHub 静态资源应使用 `/_proxy/` 路径
 - 测试公开仓库的 Raw、Download ZIP、Clone 和 Fetch
