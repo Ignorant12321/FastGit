@@ -48,11 +48,14 @@
   const POP_CHROME = 104; // 面板固定部分：内边距 + 标题 + 添加行
   const POP_ROW = 42;     // 列表每行大约高度
   const NAV_TUCK_MS = 320; // 与 styles.css 里 nav-tuck .3s 对应：外链收拢动画放完才补 hidden
+  const DIALOG_EXIT_MS = 220; // 确认框退场兜底：正常由 dialog-out 的 animationend 收尾，动画被打断时才等到点
 
   const ICON_COPY  = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
   const ICON_CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   const ICON_ALERT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>';
   const ICON_OUT   = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+  // akar-icons:trash-can（和「清空记录」用同一个图标，行内删除与整页清空看起来是一套）
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16l-1.58 14.22A2 2 0 0 1 16.432 22H7.568a2 2 0 0 1-1.988-1.78zm3.345-2.853A2 2 0 0 1 9.154 2h5.692a2 2 0 0 1 1.81 1.147L18 6H6zM2 6h20m-12 5v5m4-5v5"/></svg>';
 
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -73,6 +76,9 @@
     recentBack: $('#recentBack'),
     recentSub: $('#recentSub'),
     clearHistoryBtn: $('#clearHistory'),
+    clearConfirm: $('#clearConfirm'),
+    clearCancel: $('#clearCancel'),
+    clearOk: $('#clearOk'),
     main:     $('main'),
     header:   $('.site-header'),
     themeToggle: $('#themeToggle'),
@@ -580,6 +586,8 @@
   });
 
   document.addEventListener('keydown', (e) => {
+    // 确认框打开时由它自己处理 Esc，页面快捷键一律让路（否则 Esc 会顺手把「最近访问」也退掉）
+    if (el.clearConfirm.open) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       if (recentPageOpen()) focusOnClose = 'input';   // 直接回首页输入框
@@ -718,7 +726,7 @@
       return;
     }
 
-    el.recentSub.textContent = `共 ${history.length} 条 · 只保存在本地浏览器里`;
+    el.recentSub.textContent = `共 ${history.length} 条 · 只保存在本地浏览器`;
 
     el.recentList.innerHTML = history.map((item) => {
       const acc = proxy(item.url);
@@ -729,6 +737,8 @@
           <span class="r-time" data-at="${item.at}">${relativeTime(item.at)}</span>
           <button class="copy" type="button" data-copy="${escapeHtml(acc)}" data-label="复制">${ICON_COPY}<span>复制</span></button>
           <a class="r-more" href="${escapeHtml(acc)}" target="_blank" rel="noopener">打开${ICON_OUT}</a>
+          <button class="r-del" type="button" data-del-url="${escapeHtml(item.url)}"
+                  title="删除这条记录" aria-label="删除这条记录">${ICON_TRASH}</button>
         </li>`;
     }).join('');
 
@@ -747,17 +757,100 @@
   }
 
   el.recentList.addEventListener('click', (e) => {
+    const del = e.target.closest('button[data-del-url]');
+    if (del) { removeHistoryItem(del.dataset.delUrl); return; }
+
     const btn = e.target.closest('button[data-copy]');
     if (!btn) return;
     copyText(btn.dataset.copy, btn);
   });
 
+  /** 删掉一行：整列表重绘后把焦点挪到同一位置的下一行（没有就交给「返回」），别让焦点掉到 body */
+  function removeHistoryItem(url) {
+    const index = history.findIndex((item) => item.url === url);
+    if (index === -1) return;
+
+    history.splice(index, 1);
+    saveHistory();
+    renderHistory();
+
+    if (!recentPageOpen()) return;
+    const rows = el.recentList.querySelectorAll('.r-del');
+    const next = rows[index] || rows[rows.length - 1];
+    (next || el.recentBack).focus({ preventScroll: true });
+    toast('已删除这条记录');
+  }
+
+  let confirmClosing = false;   // 退场动画进行中：这期间不再接受新的关闭请求
+  let confirmExitTimer = 0;
+
+  /* 清空是破坏性操作，先弹确认框（原生 <dialog>，Esc / 点遮罩都能取消） */
   el.clearHistoryBtn.addEventListener('click', () => {
+    if (!history.length) return;
+    if (typeof el.clearConfirm.showModal !== 'function') {
+      // 老浏览器没有 <dialog>，退回系统确认框
+      if (window.confirm(`清空 ${history.length} 条最近访问记录？`)) clearHistory();
+      return;
+    }
+    // 上一次退场可能还没演完就又被打开，先复位，免得带着 is-closing 进来
+    clearTimeout(confirmExitTimer);
+    confirmClosing = false;
+    el.clearConfirm.classList.remove('is-closing');
+    el.clearConfirm.showModal();
+    el.clearOk.focus({ preventScroll: true });   // 默认落在「清空」上，键盘可以直接确认
+  });
+
+  el.clearCancel.addEventListener('click', () => closeClearConfirm());
+
+  // 确认后要等框淡掉再清列表，否则背后的记录会当着人脸消失
+  el.clearOk.addEventListener('click', () => closeClearConfirm(clearHistory));
+
+  // 原生 <dialog> 的遮罩也在 dialog 元素上，所以点卡片外面就等于点遮罩
+  el.clearConfirm.addEventListener('click', (e) => {
+    if (e.target === el.clearConfirm) closeClearConfirm();
+  });
+
+  // Esc 的默认行为是立刻 close()，拦下来走同一套退场动画
+  el.clearConfirm.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeClearConfirm();
+  });
+
+  /**
+   * 关确认框：先演退场动画，animationend 之后再真正 close()。
+   * dialog 一旦 close() 就立刻离开 top layer，直接关会「啪」地一下消失。
+   * 定时器只是兜底：动画被中断（或系统关了动画）时不能把框卡在屏幕上。
+   */
+  function closeClearConfirm(afterClose) {
+    if (!el.clearConfirm.open || confirmClosing) return;
+    confirmClosing = true;
+    el.clearConfirm.classList.add('is-closing');
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(confirmExitTimer);
+      el.clearConfirm.removeEventListener('animationend', onExit);
+      confirmClosing = false;
+      el.clearConfirm.classList.remove('is-closing');
+      if (el.clearConfirm.open) el.clearConfirm.close();
+      if (afterClose) afterClose();
+    };
+    const onExit = (e) => { if (e.animationName === 'dialog-out') finish(); };
+
+    el.clearConfirm.addEventListener('animationend', onExit);
+    confirmExitTimer = setTimeout(finish, DIALOG_EXIT_MS);
+  }
+
+  function clearHistory() {
     history = [];
     saveHistory();
     renderHistory();
+    // 清空后「清空记录」按钮自己也藏起来了，别把焦点留在已经不可见的按钮上
+    if (recentPageOpen()) el.recentBack.focus({ preventScroll: true });
     toast('已清空本地记录');
-  });
+  }
 
   /* ------------------------------------ 最近访问：独立一页 + 滑入过渡 */
 
@@ -792,6 +885,8 @@
       });
     } else {
       // 退出：焦点先回到触发处（或直接回输入框），再隐藏这一页
+      // 确认框开着时一起收掉；已经在退场动画里的就让它自己走完（别丢掉那次确认）
+      if (el.clearConfirm.open && !confirmClosing) el.clearConfirm.close();
       const target = focusOnClose === 'input' ? el.input : el.navRecent;
       focusOnClose = 'nav';
       target.focus({ preventScroll: true });

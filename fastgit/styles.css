@@ -771,6 +771,21 @@ body.is-recent { overflow: hidden; }
 .recent-item:hover .r-url { color: var(--text); }
 .recent-item .r-time { flex: 0 0 auto; font-size: .74rem; color: var(--text-faint); }
 .recent-item .copy { padding: 5px 11px; font-size: .75rem; }
+/* 单条删除：平时不出现，指针移到这一行（或键盘 Tab 进这一行）才浮出来，
+   否则每行都挂一个垃圾桶，列表看起来全是按钮。 */
+.r-del {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity .18s var(--ease), color .18s var(--ease), background .18s var(--ease);
+}
+.recent-item:hover .r-del,
+.recent-item:focus-within .r-del { opacity: 1; }
+.r-del:hover { color: var(--danger); background: var(--surface-hi); }
+.r-del:active { transform: scale(.92); }
 .r-more {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; gap: 4px;
@@ -796,6 +811,101 @@ body.is-recent { overflow: hidden; }
 .copy:active { transform: scale(.95); }
 .copy.is-done { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 55%, transparent); background: color-mix(in srgb, var(--signal) 14%, transparent); }
 .copy.is-done svg { animation: pop-in .3s var(--ease); }
+
+/* -------------------------------------------------------- confirm dialog */
+
+/* 破坏性操作的二次确认走原生 <dialog>：Esc、遮罩、焦点圈定、关闭后焦点归位都由浏览器兜底 */
+.confirm {
+  width: min(92vw, 384px);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.confirm::backdrop {
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(3px);
+  animation: backdrop-in .24s var(--ease) both;
+}
+/* 入场 / 退场都留着：.is-closing 由 app.js 加上，动画放完才真正 close() */
+.confirm[open] { animation: dialog-in .24s var(--ease) both; }
+.confirm[open].is-closing { animation: dialog-out .18s var(--ease) both; }
+.confirm.is-closing::backdrop { animation: backdrop-out .18s var(--ease) both; }
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes dialog-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(10px) scale(.98); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.confirm-card { padding: 22px 22px 18px; }
+
+.confirm-title {
+  display: flex; align-items: center; gap: 9px;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+/* 标题前的图标垫一层淡红圆底：一眼看出这是破坏性操作，也不至于整块染红 */
+.confirm-ico {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+
+.confirm-text {
+  margin: 14px 0 0;
+  font-size: .84rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+/* 「不可撤销」这行压小压暗，居中：它是补充说明，不该和正文抢注意力 */
+.confirm-warn {
+  margin: 4px 0 0;
+  font-size: .76rem;
+  line-height: 1.6;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.confirm-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 20px;
+}
+.confirm-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-hi);
+  font-size: .84rem;
+  color: var(--text);
+  transition: background .16s var(--ease), border-color .16s var(--ease), color .16s var(--ease), transform .16s var(--ease);
+}
+.confirm-btn:hover { background: color-mix(in srgb, var(--text) 12%, transparent); }
+.confirm-btn:active { transform: scale(.97); }
+/* 确认键染成危险色：这一下点下去不可撤销 */
+.confirm-btn.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+.confirm-btn.is-danger:hover { background: color-mix(in srgb, var(--danger) 28%, transparent); }
 
 /* ------------------------------------------------------------------ toast */
 
@@ -875,6 +985,7 @@ body.is-recent { overflow: hidden; }
   .recent-item .r-time { order: 1; margin-right: auto; }
   .recent-item .copy { order: 2; }
   .recent-item .r-more { order: 3; }
+  .recent-item .r-del { order: 4; opacity: 1; }   /* 触屏没有 hover，删除入口常显（.7 在深色下几乎看不见） */
   .node-del { opacity: .7; }
 }
 
@@ -891,4 +1002,6 @@ body.is-recent { overflow: hidden; }
   ::view-transition-new(theme-toggle-icon) {
     animation-duration: .01ms !important;
   }
+  /* 确认框的遮罩也是伪元素，同样匹配不到（框本身会被上面的 * 压掉） */
+  .confirm::backdrop { animation-duration: .01ms !important; }
 }

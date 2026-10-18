@@ -151,7 +151,7 @@
 
       <button class="text-btn" id="clearHistory" type="button">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+          <path d="M4 6h16l-1.58 14.22A2 2 0 0 1 16.432 22H7.568a2 2 0 0 1-1.988-1.78zm3.345-2.853A2 2 0 0 1 9.154 2h5.692a2 2 0 0 1 1.81 1.147L18 6H6zM2 6h20m-12 5v5m4-5v5"/>
         </svg>
         <span>清空记录</span>
       </button>
@@ -160,12 +160,32 @@
     <p class="page-sub" id="recentSub"></p>
     <ul class="recent-list" id="recentList"></ul>
     <p class="page-empty" id="recentEmpty" hidden>
-      还没有记录 —— 在这里打开过的加速链接会出现在这一页。
+      还没有记录 —— 打开过的链接会出现在这一页！
     </p>
   </div>
 </section>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- 清空记录的二次确认：用原生 <dialog>，Esc 与点击遮罩都能取消，焦点也由浏览器圈在框里 -->
+<dialog class="confirm" id="clearConfirm" aria-labelledby="clearConfirmTitle">
+  <div class="confirm-card">
+    <h3 class="confirm-title" id="clearConfirmTitle">
+      <span class="confirm-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6h16l-1.58 14.22A2 2 0 0 1 16.432 22H7.568a2 2 0 0 1-1.988-1.78zm3.345-2.853A2 2 0 0 1 9.154 2h5.692a2 2 0 0 1 1.81 1.147L18 6H6zM2 6h20m-12 5v5m4-5v5"/>
+        </svg>
+      </span>
+      清空历史
+    </h3>
+    <p class="confirm-text">「最近访问」的所有记录会从本地浏览器中移除。</p>
+    <p class="confirm-warn">清空后无法恢复！</p>
+    <div class="confirm-actions">
+      <button class="confirm-btn" id="clearCancel" type="button">取消</button>
+      <button class="confirm-btn is-danger" id="clearOk" type="button">清空</button>
+    </div>
+  </div>
+</dialog>
 
 <script src="./app.js"></script>
 </body>
