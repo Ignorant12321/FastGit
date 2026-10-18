@@ -89,6 +89,8 @@ code { font-family: var(--mono); font-size: .88em; }
 
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 
+/* 焦点圈：只对没有自带圆角的可聚焦元素生效（同优先级下，后写的组件规则会覆盖这里），
+   例如 #url、.text-btn、导航链接。组件自己声明了 border-radius 的不需要再单独覆盖。 */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -435,7 +437,6 @@ main {
   font-size: .95rem;
   outline: none;
 }
-#url::placeholder { color: transparent; }
 
 .ghost {
   position: absolute; inset: 0;
@@ -717,7 +718,6 @@ body.is-recent { overflow: hidden; }
 .back:hover svg { transform: translateX(-2px); }
 .back:active { transform: scale(.96); }
 .back:active svg { transform: translateX(-2px); }
-.back:focus-visible { border-radius: 999px; }   /* 全局 :focus-visible 会把圆角压成 4px，这里圆角保持胶囊形 */
 
 .page-sub { margin-top: 12px; font-size: .78rem; color: var(--text-faint); }
 

@@ -32,7 +32,7 @@
   const OTHER_PROXIES = [
     'ghproxy.com', 'ghproxy.net', 'gh-proxy.net', 'gh.llkk.cc', 'ghfast.top',
     'github.moeyy.xyz', 'ghps.cc', 'hub.fastgit.xyz', 'fastgit.org',
-    'gh-proxy.com', 'fastgit.ignrt.shop',
+    'gh-proxy.com',
     SELF_HOST,
   ].filter(Boolean);
 
@@ -677,7 +677,10 @@
     try {
       const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
       if (!Array.isArray(raw)) return [];
-      return raw.filter((it) => it && typeof it.url === 'string').slice(0, MAX_HISTORY);
+      // 同时校验 at：旧版本或外部写入的坏数据缺了时间戳，相对时间会算成 NaN
+      return raw
+        .filter((it) => it && typeof it.url === 'string' && Number.isFinite(it.at))
+        .slice(0, MAX_HISTORY);
     } catch (_) { return []; }
   }
 
@@ -695,6 +698,7 @@
   }
 
   function relativeTime(ts) {
+    if (!Number.isFinite(ts)) return '';
     const diff = Date.now() - ts;
     if (diff < 60e3) return '刚刚';
     if (diff < 3600e3) return `${Math.floor(diff / 60e3)} 分钟前`;
@@ -722,13 +726,24 @@
       return `
         <li class="recent-item${isNew ? ' is-new' : ''}">
           <span class="r-url" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</span>
-          <span class="r-time">${relativeTime(item.at)}</span>
+          <span class="r-time" data-at="${item.at}">${relativeTime(item.at)}</span>
           <button class="copy" type="button" data-copy="${escapeHtml(acc)}" data-label="复制">${ICON_COPY}<span>复制</span></button>
           <a class="r-more" href="${escapeHtml(acc)}" target="_blank" rel="noopener">打开${ICON_OUT}</a>
         </li>`;
     }).join('');
 
     flashUrl = null;
+  }
+
+  /**
+   * 只把「几分钟前」这类文本重写一遍。
+   * 不能整个列表重绘：那样会清掉「已复制 ✓」状态、用户选中的文本和列表的入场动画。
+   */
+  function refreshRelativeTimes() {
+    if (!history.length) return;
+    for (const node of el.recentList.querySelectorAll('.r-time')) {
+      node.textContent = relativeTime(Number(node.dataset.at));
+    }
   }
 
   el.recentList.addEventListener('click', (e) => {
@@ -767,6 +782,8 @@
     el.main.inert = open;                 // 首页在下面，别让 Tab 钻进去
 
     if (open) {
+      // 列表可能是几分钟前渲染的，先把相对时间对一遍（只改文本，不重绘）
+      refreshRelativeTimes();
       el.recent.scrollTop = 0;
       if (document.activeElement === el.input) el.input.blur();
       // 下一帧再聚焦：页面刚加载就带 #recent 时，浏览器随后会把焦点收回 BODY，这里补一次
@@ -810,7 +827,8 @@
 
   window.addEventListener('hashchange', syncRecentFromHash);
 
-  setInterval(() => { if (history.length) renderHistory(); }, 60e3);
+  // 相对时间每分钟走一格：只改文本，而且没停在「最近访问」那一页时不用刷
+  setInterval(() => { if (recentPageOpen()) refreshRelativeTimes(); }, 60e3);
 
   /* ------------------------------------------------------------ 工具函数 */
 

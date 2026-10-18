@@ -38,6 +38,10 @@ GitHub加速
 
 ![image-20261018003221159](README.assets/image-20261018003221159.png)
 
+适配移动端
+
+![image-20261018123337919](README.assets/image-20261018123337919.png)
+
 可以设置登录验证Access
 
 ![image-20261017204930240](README.assets/image-20261017204930240.png)
@@ -58,7 +62,7 @@ GitHub加速
 | 可选网页登录 | 默认关闭，按需通过环境变量开启 |
 | 域名白名单 | 只允许访问 GitHub 相关上游域名 |
 | 国内外分流 | 海外访客直接跳转 GitHub，国内访客走镜像代理 |
-| 健康检查页 | `/healthy` 显示上游状态、版本、耗时 |
+| 健康检查页 | `/__fastgit/healthy` 显示上游状态、版本、耗时 |
 | 分流诊断 | `/__fastgit/diagnostics` 显示识别地区、生效配置与分流决策 |
 
 ---
@@ -153,7 +157,7 @@ git fetch origin
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `ALLOW_LOGIN` | `false` | 设为 `true` 才允许通过镜像打开 GitHub 登录页 |
-| `SOURCE_REPOSITORY` | `ZhangShengFan/FastGit` | `/healthy` 显示版本信息时读取的仓库 |
+| `SOURCE_REPOSITORY` | `ZhangShengFan/FastGit` | `/__fastgit/healthy` 显示版本信息时读取的仓库 |
 | `CACHE_TTL` | `3600` | 静态资源缓存秒数，`0` 关闭缓存，最大 `86400` |
 | `PROXY_COUNTRIES` | `CN` | 逗号分隔的国家/地区代码（ISO 3166-1 alpha-2），仅这些地区走代理，其余直接跳转 GitHub；设为 `*` 表示所有访客都走代理（关闭分流）|
 
@@ -166,7 +170,7 @@ Cloudflare Workers：**Settings** → **Variables and Secrets**
 
 - 默认不要开启 `ALLOW_LOGIN`；开启后 GitHub 登录表单、验证码、浏览器会话都会经过你的边缘函数，只适合自用实例
 - 分流依赖访客 IP 归属地：Cloudflare 读取 `cf.country`，ESA 需在站点开启**添加访问者位置标头**（注入 `ali-ip-country`）。使用代理或 VPN 的访客可能被判定为海外而直接跳转 GitHub
-- 海外访客返回 `302`（GET/HEAD）或 `307`（其它方法，保证 git 等请求不丢方法与正文）跳转到真实 GitHub；`/healthy`、`/__fastgit/diagnostics`、登录禁用页等本地页面不受影响
+- 海外访客返回 `302`（GET/HEAD）或 `307`（其它方法，保证 git 等请求不丢方法与正文）跳转到真实 GitHub；`/__fastgit/healthy`、`/__fastgit/diagnostics`、登录禁用页等本地页面不受影响
 - 通行密钥、部分风控流程仍可能要求原始 `github.com` 域名，镜像下不保证生效
 - 自定义域名建议直接用平台的 Custom Domain，不要叠加多层 CNAME，否则 Git 客户端可能 TLS 握手失败
 - 不记录 Cookie、Authorization、令牌、表单内容或请求正文；不缓存私有内容和下载文件
@@ -208,7 +212,7 @@ GitHub 前端路由需要浏览器路径与页面的 `initial-path` 一致。直
 - 设为 `*` 关闭分流，所有访客都走代理
 - 无法识别归属地时一律走代理，避免误伤国内访客
 - 归属地来源：Cloudflare 读取 `cf.country`；ESA 需在站点开启**添加访问者位置标头**（`ali-ip-country`）
-- `GET`/`HEAD` 返回 `302`，其它方法（如 git push）返回 `307`，保证方法与请求体不丢失；`/healthy`、`/__fastgit/diagnostics`、登录禁用页等本地页面不受影响
+- `GET`/`HEAD` 返回 `302`，其它方法（如 git push）返回 `307`，保证方法与请求体不丢失；`/__fastgit/healthy`、`/__fastgit/diagnostics`、登录禁用页等本地页面不受影响
 
 ## 常见问题
 

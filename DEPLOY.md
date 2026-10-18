@@ -51,10 +51,10 @@ Cloudflare 会读取仓库根目录的 `wrangler.jsonc`，部署 `worker-cloudfl
 
 ```text
 https://你的-Worker.你的子域.workers.dev/
-https://你的-Worker.你的子域.workers.dev/healthy
+https://你的-Worker.你的子域.workers.dev/__fastgit/healthy
 ```
 
-根路径应显示 FastGit 加速首页，`/healthy` 应显示 `OK`。
+根路径应显示 FastGit 加速首页，`/__fastgit/healthy` 应显示 `OK`。
 
 ## 仪表盘设置
 
@@ -163,7 +163,7 @@ git fetch origin
 ### 健康页面
 
 ```text
-https://git.example.com/healthy
+https://git.example.com/__fastgit/healthy
 ```
 
 正常时显示 `OK` 和 7 位提交 SHA，HTTP 状态码为 `200`；异常时显示“暂不可用”，状态码为 `503`。
@@ -174,4 +174,4 @@ https://git.example.com/healthy
 2. 进入 Worker 的 **Edit code**。
 3. 完整替换入口文件内容。
 4. 点击 **Deploy**。
-5. 访问 `/healthy` 确认状态。
+5. 访问 `/__fastgit/healthy` 确认状态。

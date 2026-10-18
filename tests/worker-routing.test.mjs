@@ -56,10 +56,17 @@ for (const filename of ["worker-cloudflare.js", "worker-esa.js"]) {
       assert.equal(calls.length, 0);
     });
     await t.test("unapproved host", async (t) => {
-      t.mock.method(console, "error", () => {});
       const { response, calls } = await invoke(t, "/https://example.com/owner/repo", { country: "CN" });
-      assert.equal(response.status, 500);
+      assert.equal(response.status, 400);
+      assert.equal(response.headers.get("Cache-Control"), "no-store");
+      assert.equal(response.headers.get("X-FastGit-Route"), "blocked");
+      assert.match(await response.text(), /Upstream host is not allowed/);
       assert.equal(response.headers.get("Location"), null);
+      assert.equal(calls.length, 0);
+    });
+    await t.test("unapproved host in a proxy path", async (t) => {
+      const { response, calls } = await invoke(t, "/_proxy/example.com/owner/repo", { country: "CN" });
+      assert.equal(response.status, 400);
       assert.equal(calls.length, 0);
     });
   });
@@ -168,10 +175,16 @@ for (const filename of ["worker-cloudflare.js", "worker-esa.js"]) {
 
   await test(`${filename}: local health and login responses retain their policies`, async (t) => {
     await t.test("health", async (t) => {
-      const { response, calls } = await invoke(t, "/healthy", { country: "US" });
+      const { response, calls } = await invoke(t, "/__fastgit/healthy", { country: "US" });
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("X-FastGit-Route"), "local");
       assert.equal(calls.length, 2);
+    });
+    await t.test("/healthy is no longer shadowed", async (t) => {
+      const { response, calls } = await invoke(t, "/healthy", { country: "CN" });
+      assert.equal(response.status, 200);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, "https://github.com/healthy");
     });
     await t.test("disabled login", async (t) => {
       const { response, calls } = await invoke(t, "/https://github.com/login", { country: "US" });
