@@ -54,6 +54,8 @@
   const ICON_CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   const ICON_ALERT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>';
   const ICON_OUT   = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+  // 闪电：和首页输入框左侧那颗同一套几何；用 currentColor，颜色跟着链接走（不单独上色）
+  const ICON_BOLT  = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 0 0-2.474-1.561l-9 9A1.5 1.5 0 0 0 5.5 14h4.002a.5.5 0 0 1 .471.666L8.086 20a1.5 1.5 0 0 0 2.475 1.56l9-9A1.5 1.5 0 0 0 18.5 10h-3.997a.5.5 0 0 1-.472-.667z"/></svg>';
   // akar-icons:trash-can（和「清空记录」用同一个图标，行内删除与整页清空看起来是一套）
   const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16l-1.58 14.22A2 2 0 0 1 16.432 22H7.568a2 2 0 0 1-1.988-1.78zm3.345-2.853A2 2 0 0 1 9.154 2h5.692a2 2 0 0 1 1.81 1.147L18 6H6zM2 6h20m-12 5v5m4-5v5"/></svg>';
 
@@ -735,8 +737,11 @@
         <li class="recent-item${isNew ? ' is-new' : ''}">
           <span class="r-url" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</span>
           <span class="r-time" data-at="${item.at}">${relativeTime(item.at)}</span>
+          <a class="r-acc" href="${escapeHtml(acc)}" target="_blank" rel="noopener"
+             title="用加速链接打开">加速${ICON_BOLT}</a>
+          <a class="r-more" href="${escapeHtml(item.url)}" target="_blank" rel="noopener"
+             title="打开原始链接">打开${ICON_OUT}</a>
           <button class="copy" type="button" data-copy="${escapeHtml(acc)}" data-label="复制">${ICON_COPY}<span>复制</span></button>
-          <a class="r-more" href="${escapeHtml(acc)}" target="_blank" rel="noopener">打开${ICON_OUT}</a>
           <button class="r-del" type="button" data-del-url="${escapeHtml(item.url)}"
                   title="删除这条记录" aria-label="删除这条记录">${ICON_TRASH}</button>
         </li>`;

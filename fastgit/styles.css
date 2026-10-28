@@ -786,13 +786,24 @@ body.is-recent { overflow: hidden; }
 .recent-item:focus-within .r-del { opacity: 1; }
 .r-del:hover { color: var(--danger); background: var(--surface-hi); }
 .r-del:active { transform: scale(.92); }
+/* 一行两个出口：「加速」走所选节点，「打开」走原始链接。
+   同色、同字号，只靠图标（闪电 / 外链箭头）和先后顺序区分，不给谁单独上色。
+   内边距只是为了给 hover 底色留出呼吸，负边距再抵回去，
+   所以视觉上的间距仍是原来的 14px，不会因为多了个按钮就变松。 */
+.r-acc,
 .r-more {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: .75rem; color: var(--text-faint);
-  transition: color .18s var(--ease), transform .18s var(--ease);
+  padding: 4px 8px;
+  margin-inline: -8px -8px;
+  border-radius: 8px;
+  font-size: .75rem;
+  color: var(--text-faint);
+  transition: color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
 }
-.r-more:hover { color: var(--accent-hi); }
+.r-acc:hover,
+.r-more:hover { color: var(--text); background: var(--surface-hi); }
+.r-acc:active,
 .r-more:active { transform: scale(.94); }
 
 .copy {
@@ -983,9 +994,10 @@ body.is-recent { overflow: hidden; }
   .recent-item { flex-wrap: wrap; gap: 6px 12px; }
   .recent-item .r-url { flex: 1 1 100%; }
   .recent-item .r-time { order: 1; margin-right: auto; }
-  .recent-item .copy { order: 2; }
-  .recent-item .r-more { order: 3; }
-  .recent-item .r-del { order: 4; opacity: 1; }   /* 触屏没有 hover，删除入口常显（.7 在深色下几乎看不见） */
+  .recent-item .r-acc { order: 2; margin-inline: 0; }
+  .recent-item .r-more { order: 3; margin-inline: 0; }
+  .recent-item .copy { order: 4; }
+  .recent-item .r-del { order: 5; opacity: 1; }   /* 触屏没有 hover，删除入口常显（.7 在深色下几乎看不见） */
   .node-del { opacity: .7; }
 }
 
